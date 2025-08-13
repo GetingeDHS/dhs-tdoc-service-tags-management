@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<RunSettings>
+  <RunConfiguration>
+    <MaxCpuCount>0</MaxCpuCount>
+    <ResultsDirectory>.\TestResults</ResultsDirectory>
+    <TestSessionTimeout>300000</TestSessionTimeout>
+  </RunConfiguration>
+
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura,opencover,lcov,teamcity,json</Format>
+          <Exclude>[*.Tests?]*,[*]*.Program,[*]*Exception*</Exclude>
+          <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
+          <ExcludeByFile>**/Migrations/**/*.cs,**/wwwroot/**/*.js</ExcludeByFile>
+          <IncludeDirectory>../src/</IncludeDirectory>
+          <SingleHit>false</SingleHit>
+          <UseSourceLink>true</UseSourceLink>
+          <IncludeTestAssembly>false</IncludeTestAssembly>
+          <SkipAutoProps>true</SkipAutoProps>
+          <DeterministicReport>true</DeterministicReport>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+
+  <LoggerRunSettings>
+    <Loggers>
+      <Logger friendlyName="trx" enabled="true">
+        <Configuration>
+          <LogFileName>TestResults.trx</LogFileName>
+        </Configuration>
+      </Logger>
+      <Logger friendlyName="html" enabled="true">
+        <Configuration>
+          <LogFileName>TestResults.html</LogFileName>
+        </Configuration>
+      </Logger>
+    </Loggers>
+  </LoggerRunSettings>
+
+  <!-- Medical Device Specific Settings -->
+  <TestRunParameters>
+    <Parameter name="ComplianceStandard" value="ISO-13485" />
+    <Parameter name="CoverageThreshold" value="95" />
+    <Parameter name="RequiredPassRate" value="100" />
+    <Parameter name="MedicalDeviceMode" value="true" />
+  </TestRunParameters>
+
+  <MSTest>
+    <Parallelize>
+      <Workers>0</Workers>
+      <Scope>method</Scope>
+    </Parallelize>
+    <AssemblyResolution>
+      <Directory path="%ProgramFiles(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\IDE\Extensions\Microsoft\AdapterFramework\" includeSubDirectories="true" />
+    </AssemblyResolution>
+    <ForcedLegacyMode>false</ForcedLegacyMode>
+    <SettingsFile></SettingsFile>
+    <CaptureTraceOutput>true</CaptureTraceOutput>
+    <DeleteDeploymentDirectoryAfterTestRunIsComplete>true</DeleteDeploymentDirectoryAfterTestRunIsComplete>
+    <DeploymentEnabled>false</DeploymentEnabled>
+  </MSTest>
+</RunSettings>
