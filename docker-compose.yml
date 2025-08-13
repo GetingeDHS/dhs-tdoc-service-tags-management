@@ -28,7 +28,7 @@ services:
   tagmanagement-api:
     build:
       context: .
-      dockerfile: src/TagManagement.Api/Dockerfile
+      dockerfile: Dockerfile
     container_name: tagmanagement-api
     hostname: tagmanagement-api
     environment:
@@ -37,6 +37,8 @@ services:
       - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=TDOC;User Id=sa;Password=TagManagement2024!;TrustServerCertificate=true;MultipleActiveResultSets=true
       - Logging__LogLevel__Default=Information
       - Logging__LogLevel__Microsoft.EntityFrameworkCore=Warning
+      - MedicalDevice__ComplianceStandard=ISO-13485
+      - MedicalDevice__AuditingEnabled=true
     ports:
       - "8080:8080"
     depends_on:
@@ -44,6 +46,10 @@ services:
         condition: service_healthy
     networks:
       - tagmanagement-network
+    labels:
+      - "medical.device.compliance=ISO-13485"
+      - "service.type=microservice"
+      - "data.classification=medical"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
       interval: 30s
