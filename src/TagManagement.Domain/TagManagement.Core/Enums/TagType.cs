@@ -15,7 +15,14 @@ namespace TagManagement.Core.Enums
         Transport = 6,
         CaseCart = 7,
         TransportBox = 8,
-        InstrumentContainer = 9
+        InstrumentContainer = 9,
+        
+        // Aliases for backward compatibility with unit tests
+        BundleTag = Bundle,
+        WashTag = Wash,
+        SterilizationLoadTag = SteriLoad,
+        TransportTag = Transport,
+        TransportBoxTag = TransportBox
     }
 
     /// <summary>
