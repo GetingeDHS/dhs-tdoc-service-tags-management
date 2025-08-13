@@ -9,7 +9,7 @@ WORKDIR /app
 # Copy solution file and project files for better layer caching
 COPY *.sln ./
 COPY src/TagManagement.Api/*.csproj ./src/TagManagement.Api/
-COPY src/TagManagement.Core/*.csproj ./src/TagManagement.Core/
+COPY src/TagManagement.Domain/TagManagement.Core/*.csproj ./src/TagManagement.Domain/TagManagement.Core/
 COPY src/TagManagement.Infrastructure/*.csproj ./src/TagManagement.Infrastructure/
 COPY src/TagManagement.Application/*.csproj ./src/TagManagement.Application/
 COPY tests/TagManagement.UnitTests/*.csproj ./tests/TagManagement.UnitTests/
