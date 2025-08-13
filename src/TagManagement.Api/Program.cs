@@ -27,7 +27,7 @@ builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddControllers();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+// builder.Services.AddOpenApi(); // Not available in .NET 8
 
 // Add Swagger/OpenAPI for better API documentation
 builder.Services.AddEndpointsApiExplorer();
@@ -53,7 +53,7 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {
-    app.MapOpenApi();
+    // app.MapOpenApi(); // Not available in .NET 8
     app.UseSwagger();
     app.UseSwaggerUI();
 }
