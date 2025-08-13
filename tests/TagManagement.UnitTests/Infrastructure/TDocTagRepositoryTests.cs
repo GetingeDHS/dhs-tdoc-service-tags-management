@@ -42,7 +42,7 @@ public class TDocTagRepositoryTests : IDisposable
         {
             TagKeyId = 1,
             TagNumber = 12345,
-            TagTypeKeyId = 1,
+            TagTypeKeyId = 0, // PrepTag has enum value 0
             IsAutoTag = false,
             LocationKeyId = 100,
             CreatedTime = DateTime.UtcNow,
@@ -51,8 +51,8 @@ public class TDocTagRepositoryTests : IDisposable
 
         var tagTypeModel = new TagTypeModel
         {
-            TagTypeKeyId = 1,
-            TagTypeName = "PrepTag",
+            TagTypeKeyId = 0,
+            TagTypeName = "PrepTag", // Use correct name for TagTypeKeyId = 0
             IsActive = true
         };
 
@@ -91,7 +91,7 @@ public class TDocTagRepositoryTests : IDisposable
         {
             TagNumber = 54321,
             TagType = TagType.BundleTag,
-            TagTypeKeyId = 2,
+            TagTypeKeyId = 1, // BundleTag has enum value 1
             IsAuto = true,
             LocationKeyId = 200,
             CreatedAt = DateTime.UtcNow,
@@ -145,7 +145,7 @@ public class TDocTagRepositoryTests : IDisposable
         {
             TagNumber = 77777,
             TagType = TagType.TransportTag,
-            TagTypeKeyId = 3,
+            TagTypeKeyId = 6, // TransportTag has enum value 6
             LocationKeyId = 300,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "TestSystem"
@@ -191,7 +191,7 @@ public class TDocTagRepositoryTests : IDisposable
         {
             TagNumber = 10001,
             TagType = TagType.TransportBoxTag,
-            TagTypeKeyId = 4,
+            TagTypeKeyId = 8, // TransportBoxTag has enum value 8
             LocationKeyId = 400,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "TestSystem"
@@ -201,7 +201,7 @@ public class TDocTagRepositoryTests : IDisposable
         {
             TagNumber = 10002,
             TagType = TagType.PrepTag,
-            TagTypeKeyId = 1,
+            TagTypeKeyId = 0, // PrepTag has enum value 0
             LocationKeyId = 400,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "TestSystem"
@@ -242,7 +242,7 @@ public class TDocTagRepositoryTests : IDisposable
         {
             TagNumber = 20001,
             TagType = TagType.WashTag,
-            TagTypeKeyId = 5,
+            TagTypeKeyId = 4, // WashTag has enum value 4
             LocationKeyId = 500,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "TestSystem"
@@ -286,7 +286,7 @@ public class TDocTagRepositoryTests : IDisposable
             {
                 TagNumber = 30000 + i,
                 TagType = TagType.PrepTag,
-                TagTypeKeyId = 1,
+                TagTypeKeyId = 0, // PrepTag has enum value 0
                 LocationKeyId = 600,
                 CreatedAt = DateTime.UtcNow.AddMinutes(-i),
                 CreatedBy = "TestSystem"
@@ -332,7 +332,7 @@ public class TDocTagRepositoryTests : IDisposable
         {
             TagNumber = 40001,
             TagType = TagType.SterilizationLoadTag,
-            TagTypeKeyId = 6,
+            TagTypeKeyId = 3, // SterilizationLoadTag has enum value 3
             LocationKeyId = 700,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "TestSystem"
@@ -350,7 +350,7 @@ public class TDocTagRepositoryTests : IDisposable
         {
             TagNumber = 40002,
             TagType = TagType.PrepTag,
-            TagTypeKeyId = 1,
+            TagTypeKeyId = 0, // PrepTag has enum value 0
             LocationKeyId = 700,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "TestSystem"
