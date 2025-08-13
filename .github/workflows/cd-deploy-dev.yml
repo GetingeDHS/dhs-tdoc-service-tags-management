@@ -188,8 +188,6 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
         build-args: |
           COMPLIANCE_STANDARD=${{ env.COMPLIANCE_STANDARD }}
           BUILD_VERSION=${{ needs.validate-deployment.outputs.deployment-version }}
