@@ -1,9 +1,11 @@
 # Tag Management Microservice - Project Journal & Changelog
 
 **Project**: Medical Device Tag Management Microservice  
+**Repository**: dhs-tdoc-service-tags-management  
+**Organization**: getingedhs  
 **Compliance Standard**: ISO-13485  
 **Started**: 2025-01-13  
-**Last Updated**: 2025-01-13  
+**Last Updated**: 2025-01-13
 
 ## Project Overview
 
@@ -201,7 +203,7 @@ TagManagement.sln
 
 - **Operating System**: Windows
 - **Shell**: PowerShell 5.1.22000.2003
-- **Working Directory**: `M:\repo\test\tags`
+- **Working Directory**: `M:\repos\github\getingedhs\dhs-tdoc-service-tags-management`
 - **.NET Version**: .NET 8.0
 - **Database**: SQL Server (TDOC database)
 - **Containerization**: Docker with docker-compose
@@ -241,7 +243,7 @@ This project adheres to medical device software development standards:
 
 ```powershell
 # Navigate to project directory
-Set-Location "M:\repo\test\tags"
+Set-Location "M:\repos\github\getingedhs\dhs-tdoc-service-tags-management"
 
 # Build entire solution
 dotnet build TagManagement.sln
