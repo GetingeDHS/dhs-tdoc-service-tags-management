@@ -1,0 +1,134 @@
+version: '3.8'
+
+services:
+  # SQL Server Database
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: tagmanagement-db
+    hostname: sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=TagManagement2024!
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+      - ./infrastructure/database/init:/docker-entrypoint-initdb.d
+    networks:
+      - tagmanagement-network
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P TagManagement2024! -Q 'SELECT 1' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Tag Management API
+  tagmanagement-api:
+    build:
+      context: .
+      dockerfile: src/TagManagement.Api/Dockerfile
+    container_name: tagmanagement-api
+    hostname: tagmanagement-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=TDOC;User Id=sa;Password=TagManagement2024!;TrustServerCertificate=true;MultipleActiveResultSets=true
+      - Logging__LogLevel__Default=Information
+      - Logging__LogLevel__Microsoft.EntityFrameworkCore=Warning
+    ports:
+      - "8080:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - tagmanagement-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Test Database (for integration tests)
+  sqlserver-test:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: tagmanagement-db-test
+    hostname: sqlserver-test
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=TagManagementTest2024!
+      - MSSQL_PID=Developer
+    ports:
+      - "1434:1433"
+    volumes:
+      - sqlserver_test_data:/var/opt/mssql
+    networks:
+      - tagmanagement-network
+    profiles:
+      - testing
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P TagManagementTest2024! -Q 'SELECT 1' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Database Migration Service
+  database-migrator:
+    build:
+      context: .
+      dockerfile: tools/DatabaseMigrator/Dockerfile
+    container_name: tagmanagement-migrator
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=TDOC;User Id=sa;Password=TagManagement2024!;TrustServerCertificate=true;MultipleActiveResultSets=true
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - tagmanagement-network
+    profiles:
+      - migration
+
+  # Prometheus for monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: tagmanagement-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - tagmanagement-network
+    profiles:
+      - monitoring
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: tagmanagement-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/monitoring/grafana:/etc/grafana/provisioning
+    networks:
+      - tagmanagement-network
+    profiles:
+      - monitoring
+
+networks:
+  tagmanagement-network:
+    driver: bridge
+    name: tagmanagement-network
+
+volumes:
+  sqlserver_data:
+    name: tagmanagement-sqlserver-data
+  sqlserver_test_data:
+    name: tagmanagement-sqlserver-test-data
+  grafana_data:
+    name: tagmanagement-grafana-data
