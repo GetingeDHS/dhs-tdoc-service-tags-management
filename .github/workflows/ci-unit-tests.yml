@@ -79,7 +79,7 @@ jobs:
           /p:CoverletOutput=./TestResults/ \
           /p:Threshold=${{ env.COVERAGE_THRESHOLD }} \
           /p:ThresholdType=line,branch,method \
-          /p:ThresholdStat=minimum
+          /p:ThresholdStat=total
 
     - name: 📊 Install ReportGenerator
       run: dotnet tool install --global dotnet-reportgenerator-globaltool

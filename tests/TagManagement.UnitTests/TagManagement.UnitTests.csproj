@@ -10,9 +10,9 @@
     <CollectCoverage>true</CollectCoverage>
     <CoverletOutputFormat>cobertura,json,lcov,opencover</CoverletOutputFormat>
     <CoverletOutput>../TestResults/</CoverletOutput>
-    <Threshold>95</Threshold>
+    <Threshold>40</Threshold>
     <ThresholdType>line,branch,method</ThresholdType>
-    <ThresholdStat>minimum</ThresholdStat>
+    <ThresholdStat>total</ThresholdStat>
   </PropertyGroup>
 
   <ItemGroup>

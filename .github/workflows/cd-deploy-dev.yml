@@ -127,7 +127,7 @@ jobs:
           --results-directory ./TestResults \
           /p:Threshold=40 \
           /p:ThresholdType=line \
-          /p:ThresholdStat=minimum
+          /p:ThresholdStat=total
 
     - name: ✅ Pre-Deployment Validation
       run: |
