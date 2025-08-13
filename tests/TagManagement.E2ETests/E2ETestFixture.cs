@@ -15,10 +15,10 @@ public class E2ETestFixture : IDisposable
 {
     private bool _disposed = false;
 
-    public IServiceProvider ServiceProvider { get; private set; }
-    public IConfiguration Configuration { get; private set; }
-    public RestClient ApiClient { get; private set; }
-    public string ApiBaseUrl { get; private set; }
+    public IServiceProvider ServiceProvider { get; private set; } = null!;
+    public IConfiguration Configuration { get; private set; } = null!;
+    public RestClient ApiClient { get; private set; } = null!;
+    public string ApiBaseUrl { get; private set; } = null!;
 
     public E2ETestFixture()
     {
