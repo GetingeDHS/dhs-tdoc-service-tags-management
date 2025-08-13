@@ -155,3 +155,4 @@ namespace TagManagement.Infrastructure.Persistence
             });
         }
     }
+}

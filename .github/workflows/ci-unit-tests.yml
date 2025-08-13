@@ -1,0 +1,277 @@
+name: CI - Unit Tests & Coverage
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '*.sln'
+      - '*.csproj'
+  workflow_dispatch:
+    inputs:
+      coverage_threshold:
+        description: 'Code coverage threshold'
+        required: false
+        default: '95'
+        type: string
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  SOLUTION_PATH: './TagManagement.sln'
+  COVERAGE_THRESHOLD: ${{ github.event.inputs.coverage_threshold || '95' }}
+  COMPLIANCE_STANDARD: 'ISO-13485'
+
+jobs:
+  unit-tests:
+    name: Unit Tests & Coverage Analysis
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+      
+    outputs:
+      coverage-percentage: ${{ steps.coverage-analysis.outputs.coverage-percentage }}
+      test-results: ${{ steps.coverage-analysis.outputs.test-results }}
+      
+    steps:
+    - name: 🔄 Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: ⚙️ Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: 📦 Cache NuGet Packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: 🔧 Restore Dependencies
+      run: dotnet restore ${{ env.SOLUTION_PATH }}
+
+    - name: 🏗️ Build Solution
+      run: |
+        dotnet build ${{ env.SOLUTION_PATH }} \
+          --configuration Release \
+          --no-restore \
+          --verbosity minimal
+
+    - name: 🧪 Run Unit Tests with Coverage
+      run: |
+        dotnet test ${{ env.SOLUTION_PATH }} \
+          --configuration Release \
+          --no-build \
+          --logger "trx;LogFileName=test-results.trx" \
+          --logger "console;verbosity=normal" \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ./TestResults \
+          --settings coverlet.runsettings \
+          /p:CoverletOutputFormat=cobertura \
+          /p:CoverletOutput=./TestResults/ \
+          /p:Threshold=${{ env.COVERAGE_THRESHOLD }} \
+          /p:ThresholdType=line,branch,method \
+          /p:ThresholdStat=minimum
+
+    - name: 📊 Install ReportGenerator
+      run: dotnet tool install --global dotnet-reportgenerator-globaltool
+
+    - name: 📈 Generate Coverage Report
+      run: |
+        reportgenerator \
+          "-reports:TestResults/**/coverage.cobertura.xml" \
+          "-targetdir:TestResults/CoverageReport" \
+          "-reporttypes:Html;HtmlSummary;Badges;TextSummary;JsonSummary" \
+          "-title:Tag Management Service - Unit Test Coverage" \
+          "-tag:${{ env.COMPLIANCE_STANDARD }};Medical Device;Unit Tests" \
+          "-historydir:TestResults/CoverageHistory"
+
+    - name: 🏥 Generate Medical Device Test Report
+      run: |
+        dotnet run --project tools/TestReporting/TestReportGenerator.csproj -- generate \
+          --test-results ./TestResults \
+          --coverage-report ./TestResults/coverage.cobertura.xml \
+          --output-dir ./TestResults \
+          --project-name "Tag Management Service" \
+          --compliance-standard "${{ env.COMPLIANCE_STANDARD }}" \
+          --include-medical-validation true
+
+    - name: 📋 Extract Coverage Information
+      id: coverage-analysis
+      run: |
+        # Extract coverage percentage from summary file
+        if [ -f "TestResults/CoverageReport/Summary.json" ]; then
+          COVERAGE=$(cat TestResults/CoverageReport/Summary.json | jq -r '.summary.linecoverage')
+          echo "coverage-percentage=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "Coverage: $COVERAGE%"
+        else
+          echo "coverage-percentage=0" >> $GITHUB_OUTPUT
+          echo "Coverage: No coverage data found"
+        fi
+        
+        # Count test results
+        TOTAL_TESTS=$(find TestResults -name "*.trx" -exec grep -o 'total="[^"]*"' {} \; | grep -o '[0-9]*' | head -1 || echo "0")
+        PASSED_TESTS=$(find TestResults -name "*.trx" -exec grep -o 'passed="[^"]*"' {} \; | grep -o '[0-9]*' | head -1 || echo "0")
+        FAILED_TESTS=$(find TestResults -name "*.trx" -exec grep -o 'failed="[^"]*"' {} \; | grep -o '[0-9]*' | head -1 || echo "0")
+        
+        echo "test-results=Total: $TOTAL_TESTS, Passed: $PASSED_TESTS, Failed: $FAILED_TESTS" >> $GITHUB_OUTPUT
+
+    - name: 📄 Publish Test Results
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: Unit Test Results
+        path: TestResults/*.trx
+        reporter: dotnet-trx
+        fail-on-error: true
+        max-annotations: 10
+
+    - name: 📁 Upload Test Results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: unit-test-results
+        path: |
+          TestResults/
+          !TestResults/**/coverage.cobertura.xml
+        retention-days: 30
+
+    - name: 📁 Upload Coverage Reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: coverage-reports
+        path: |
+          TestResults/CoverageReport/
+          TestResults/TestReport.html
+          TestResults/MedicalDeviceValidation.html
+          TestResults/ComplianceSummary.txt
+        retention-days: 30
+
+    - name: 💬 Comment Coverage on PR
+      uses: marocchino/sticky-pull-request-comment@v2
+      if: github.event_name == 'pull_request'
+      with:
+        recreate: true
+        message: |
+          ## 🏥 Medical Device Unit Test Results
+          
+          **Compliance Standard:** ${{ env.COMPLIANCE_STANDARD }}
+          
+          ### 📊 Test Summary
+          ${{ steps.coverage-analysis.outputs.test-results }}
+          
+          ### 📈 Code Coverage
+          - **Line Coverage:** ${{ steps.coverage-analysis.outputs.coverage-percentage }}%
+          - **Threshold:** ${{ env.COVERAGE_THRESHOLD }}%
+          - **Status:** ${{ steps.coverage-analysis.outputs.coverage-percentage >= env.COVERAGE_THRESHOLD && '✅ PASSED' || '❌ FAILED' }}
+          
+          ### 📋 Medical Device Compliance
+          - Coverage meets medical device requirements: ${{ steps.coverage-analysis.outputs.coverage-percentage >= env.COVERAGE_THRESHOLD && '✅ Yes' || '❌ No' }}
+          - All unit tests passed: ${{ contains(steps.coverage-analysis.outputs.test-results, 'Failed: 0') && '✅ Yes' || '❌ No' }}
+          
+          ### 📁 Artifacts
+          - [📊 Coverage Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          - [🏥 Medical Device Validation Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          - [📋 Compliance Summary](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          
+          ---
+          *Generated by CI Pipeline • Run #${{ github.run_number }} • ${{ github.sha }}<*
+
+    - name: ✅ Validate Medical Device Compliance
+      run: |
+        COVERAGE=${{ steps.coverage-analysis.outputs.coverage-percentage }}
+        THRESHOLD=${{ env.COVERAGE_THRESHOLD }}
+        
+        echo "Validating Medical Device Compliance..."
+        echo "Coverage: $COVERAGE%"
+        echo "Required Threshold: $THRESHOLD%"
+        
+        if (( $(echo "$COVERAGE >= $THRESHOLD" | bc -l) )); then
+          echo "✅ Medical Device Compliance: PASSED"
+          echo "Coverage meets ISO-13485 requirements"
+        else
+          echo "❌ Medical Device Compliance: FAILED"
+          echo "Coverage below required threshold for medical device software"
+          exit 1
+        fi
+        
+        # Check for failed tests
+        if [[ "${{ steps.coverage-analysis.outputs.test-results }}" == *"Failed: 0"* ]]; then
+          echo "✅ All unit tests passed"
+        else
+          echo "❌ Some unit tests failed"
+          exit 1
+        fi
+        
+        echo "🏥 Medical Device Unit Testing: COMPLIANT"
+
+  build-test-artifacts:
+    name: Build Test Report Generator
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    steps:
+    - name: 🔄 Checkout Code
+      uses: actions/checkout@v4
+
+    - name: ⚙️ Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: 🏗️ Build Test Report Generator
+      run: |
+        dotnet build tools/TestReporting/TestReportGenerator.csproj \
+          --configuration Release \
+          --verbosity minimal
+
+    - name: 📦 Package Test Report Generator
+      run: |
+        dotnet publish tools/TestReporting/TestReportGenerator.csproj \
+          --configuration Release \
+          --output ./artifacts/TestReporting \
+          --self-contained false
+
+    - name: 📁 Upload Test Report Generator
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-report-generator
+        path: artifacts/TestReporting/
+        retention-days: 30
+
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: [unit-tests, build-test-artifacts]
+    if: always()
+    
+    steps:
+    - name: 🔍 Evaluate Quality Gate
+      run: |
+        echo "Evaluating Quality Gate for Medical Device Compliance..."
+        
+        UNIT_TESTS_RESULT="${{ needs.unit-tests.result }}"
+        BUILD_RESULT="${{ needs.build-test-artifacts.result }}"
+        COVERAGE="${{ needs.unit-tests.outputs.coverage-percentage }}"
+        
+        echo "Unit Tests: $UNIT_TESTS_RESULT"
+        echo "Build: $BUILD_RESULT"
+        echo "Coverage: $COVERAGE%"
+        
+        if [[ "$UNIT_TESTS_RESULT" == "success" && "$BUILD_RESULT" == "success" ]]; then
+          echo "✅ Quality Gate: PASSED"
+          echo "All checks passed - Ready for medical device deployment"
+        else
+          echo "❌ Quality Gate: FAILED"
+          echo "Some checks failed - Medical device compliance not met"
+          exit 1
+        fi

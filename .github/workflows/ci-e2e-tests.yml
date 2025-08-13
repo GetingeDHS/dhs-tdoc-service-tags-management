@@ -1,0 +1,361 @@
+name: CI - End-to-End Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Test environment'
+        required: false
+        default: 'e2e'
+        type: choice
+        options:
+        - e2e
+        - staging
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  SOLUTION_PATH: './TagManagement.sln'
+  SQL_SERVER_VERSION: '2022-latest'
+  COMPLIANCE_STANDARD: 'ISO-13485'
+  TEST_DATABASE_NAME: 'TDocTestDB'
+
+jobs:
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+      
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:${{ env.SQL_SERVER_VERSION }}
+        env:
+          ACCEPT_EULA: Y
+          SA_PASSWORD: 'MedicalDevice123!'
+          MSSQL_PID: Developer
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd="/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P MedicalDevice123! -Q 'SELECT 1'"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    
+    steps:
+    - name: 🔄 Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: ⚙️ Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: 📦 Cache NuGet Packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: 🗄️ Wait for SQL Server
+      run: |
+        echo "Waiting for SQL Server to be ready..."
+        for i in {1..60}; do
+          if docker exec $(docker ps -q -f ancestor=mcr.microsoft.com/mssql/server:${{ env.SQL_SERVER_VERSION }}) \
+             /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'MedicalDevice123!' -Q 'SELECT 1' > /dev/null 2>&1; then
+            echo "SQL Server is ready!"
+            break
+          fi
+          echo "Waiting for SQL Server... ($i/60)"
+          sleep 2
+        done
+
+    - name: 🗄️ Create Test Database
+      run: |
+        echo "Creating test database..."
+        docker exec $(docker ps -q -f ancestor=mcr.microsoft.com/mssql/server:${{ env.SQL_SERVER_VERSION }}) \
+          /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'MedicalDevice123!' \
+          -Q "CREATE DATABASE [${{ env.TEST_DATABASE_NAME }}];"
+        
+        echo "Setting database collation..."
+        docker exec $(docker ps -q -f ancestor=mcr.microsoft.com/mssql/server:${{ env.SQL_SERVER_VERSION }}) \
+          /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'MedicalDevice123!' \
+          -Q "ALTER DATABASE [${{ env.TEST_DATABASE_NAME }}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; 
+              ALTER DATABASE [${{ env.TEST_DATABASE_NAME }}] COLLATE SQL_Latin1_General_CP1_CI_AS; 
+              ALTER DATABASE [${{ env.TEST_DATABASE_NAME }}] SET MULTI_USER;"
+
+    - name: 🗄️ Initialize Test Database Schema
+      run: |
+        echo "Initializing TDOC test database schema..."
+        docker exec $(docker ps -q -f ancestor=mcr.microsoft.com/mssql/server:${{ env.SQL_SERVER_VERSION }}) \
+          /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'MedicalDevice123!' -d ${{ env.TEST_DATABASE_NAME }} \
+          -Q "
+          -- Create TDocTagType table
+          CREATE TABLE TDocTagType (
+              TagTypeID INT IDENTITY(1,1) PRIMARY KEY,
+              TagTypeName NVARCHAR(50) NOT NULL,
+              TagTypeCode NVARCHAR(10) NOT NULL UNIQUE,
+              IsActive BIT NOT NULL DEFAULT 1,
+              CreatedDate DATETIME2 NOT NULL DEFAULT GETDATE(),
+              LastModifiedDate DATETIME2 NOT NULL DEFAULT GETDATE()
+          );
+
+          -- Create TDocUnit table
+          CREATE TABLE TDocUnit (
+              UnitID INT IDENTITY(1,1) PRIMARY KEY,
+              UnitNumber NVARCHAR(50) NOT NULL UNIQUE,
+              ProductCode NVARCHAR(50) NOT NULL,
+              CustomerCode NVARCHAR(50) NOT NULL,
+              UnitStatus NVARCHAR(20) NOT NULL DEFAULT 'Active',
+              LifeStatus NVARCHAR(20) NOT NULL DEFAULT 'Prep',
+              CreatedDate DATETIME2 NOT NULL DEFAULT GETDATE(),
+              LastModifiedDate DATETIME2 NOT NULL DEFAULT GETDATE()
+          );
+
+          -- Create TDocTag table (main table)
+          CREATE TABLE TDocTag (
+              TagID INT IDENTITY(1,1) PRIMARY KEY,
+              TagNumber NVARCHAR(50) NOT NULL,
+              TagTypeID INT NOT NULL,
+              IsAutoTag BIT NOT NULL DEFAULT 0,
+              TagStatus NVARCHAR(20) NOT NULL DEFAULT 'Active',
+              CreatedDate DATETIME2 NOT NULL DEFAULT GETDATE(),
+              LastModifiedDate DATETIME2 NOT NULL DEFAULT GETDATE(),
+              CreatedBy NVARCHAR(100) NOT NULL DEFAULT SYSTEM_USER,
+              CONSTRAINT FK_TDocTag_TagType FOREIGN KEY (TagTypeID) REFERENCES TDocTagType(TagTypeID)
+          );
+
+          -- Create TDocTagContent table
+          CREATE TABLE TDocTagContent (
+              TagContentID INT IDENTITY(1,1) PRIMARY KEY,
+              TagID INT NOT NULL,
+              UnitID INT NULL,
+              ChildTagID INT NULL,
+              ContentType NVARCHAR(20) NOT NULL CHECK (ContentType IN ('Unit', 'Tag', 'Item')),
+              ItemDescription NVARCHAR(255) NULL,
+              Quantity INT NOT NULL DEFAULT 1,
+              AddedDate DATETIME2 NOT NULL DEFAULT GETDATE(),
+              AddedBy NVARCHAR(100) NOT NULL DEFAULT SYSTEM_USER,
+              CONSTRAINT FK_TDocTagContent_Tag FOREIGN KEY (TagID) REFERENCES TDocTag(TagID) ON DELETE CASCADE,
+              CONSTRAINT FK_TDocTagContent_Unit FOREIGN KEY (UnitID) REFERENCES TDocUnit(UnitID),
+              CONSTRAINT FK_TDocTagContent_ChildTag FOREIGN KEY (ChildTagID) REFERENCES TDocTag(TagID)
+          );
+
+          -- Insert test tag types
+          INSERT INTO TDocTagType (TagTypeName, TagTypeCode) VALUES
+              ('Prep Tag', 'PREP'),
+              ('Bundle Tag', 'BUNDLE'),
+              ('Basket Tag', 'BASKET'),
+              ('Sterilization Load Tag', 'STERIL'),
+              ('Wash Tag', 'WASH'),
+              ('Transport Tag', 'TRANS'),
+              ('Case Cart Tag', 'CART'),
+              ('Transport Box Tag', 'TBOX'),
+              ('Instrument Container Tag', 'INSTR');
+
+          -- Insert test units
+          INSERT INTO TDocUnit (UnitNumber, ProductCode, CustomerCode, UnitStatus, LifeStatus) VALUES
+              ('UNIT-001', 'PROD-A', 'CUST-001', 'Active', 'Prep'),
+              ('UNIT-002', 'PROD-A', 'CUST-001', 'Active', 'Prep'),
+              ('UNIT-003', 'PROD-B', 'CUST-002', 'Active', 'Wash'),
+              ('UNIT-004', 'PROD-C', 'CUST-001', 'Active', 'Sterilization'),
+              ('UNIT-005', 'PROD-B', 'CUST-002', 'Inactive', 'Storage');
+
+          -- Insert test tags
+          INSERT INTO TDocTag (TagNumber, TagTypeID, IsAutoTag, TagStatus) VALUES
+              ('PREP-001', 1, 0, 'Active'),
+              ('BUNDLE-001', 2, 1, 'Active'),
+              ('BASKET-001', 3, 0, 'Active'),
+              ('STERIL-001', 4, 1, 'Active');
+
+          -- Insert test tag contents
+          INSERT INTO TDocTagContent (TagID, UnitID, ContentType) VALUES
+              (1, 1, 'Unit'),
+              (1, 2, 'Unit'),
+              (2, 3, 'Unit'),
+              (3, 4, 'Unit'),
+              (3, 1, 'Unit');
+
+          -- Create indexes for performance
+          CREATE INDEX IX_TDocTag_TagNumber ON TDocTag(TagNumber);
+          CREATE INDEX IX_TDocTag_TagTypeID ON TDocTag(TagTypeID);
+          CREATE INDEX IX_TDocTagContent_TagID ON TDocTagContent(TagID);
+          CREATE INDEX IX_TDocTagContent_UnitID ON TDocTagContent(UnitID);
+          CREATE INDEX IX_TDocUnit_UnitNumber ON TDocUnit(UnitNumber);
+          "
+
+    - name: 🔧 Restore Dependencies
+      run: dotnet restore ${{ env.SOLUTION_PATH }}
+
+    - name: 🏗️ Build Solution
+      run: |
+        dotnet build ${{ env.SOLUTION_PATH }} \
+          --configuration Release \
+          --no-restore \
+          --verbosity minimal
+
+    - name: 🚀 Start Tag Management API
+      env:
+        ConnectionStrings__DefaultConnection: 'Server=localhost,1433;Database=${{ env.TEST_DATABASE_NAME }};User Id=sa;Password=MedicalDevice123!;TrustServerCertificate=true;MultipleActiveResultSets=true'
+        ASPNETCORE_ENVIRONMENT: Testing
+        ASPNETCORE_URLS: 'http://localhost:5000'
+      run: |
+        echo "Starting Tag Management API..."
+        cd src/TagManagement.Api
+        dotnet run --configuration Release --no-build &
+        API_PID=$!
+        echo "API_PID=$API_PID" >> $GITHUB_ENV
+        
+        echo "Waiting for API to start..."
+        for i in {1..30}; do
+          if curl -f http://localhost:5000/health > /dev/null 2>&1; then
+            echo "API is ready!"
+            break
+          fi
+          echo "Waiting for API... ($i/30)"
+          sleep 2
+        done
+        
+        # Verify API is responding
+        curl -f http://localhost:5000/health || (echo "API failed to start" && exit 1)
+
+    - name: 🧪 Run End-to-End Tests
+      env:
+        ConnectionStrings__DefaultConnection: 'Server=localhost,1433;Database=${{ env.TEST_DATABASE_NAME }};User Id=sa;Password=MedicalDevice123!;TrustServerCertificate=true;MultipleActiveResultSets=true'
+        API_BASE_URL: 'http://localhost:5000'
+        E2E_TEST_ENVIRONMENT: 'ci'
+      run: |
+        echo "Running End-to-End Tests..."
+        dotnet test tests/TagManagement.E2ETests/ \
+          --configuration Release \
+          --no-build \
+          --logger "trx;LogFileName=e2e-test-results.trx" \
+          --logger "console;verbosity=normal" \
+          --results-directory ./TestResults \
+          --collect:"XPlat Code Coverage" \
+          -- TestRunParameters.Parameter\(name=ApiBaseUrl,value=http://localhost:5000\)
+
+    - name: 🔍 API Health Check & Diagnostics
+      if: always()
+      run: |
+        echo "=== API Health Check ==="
+        curl -f http://localhost:5000/health || echo "Health check failed"
+        
+        echo "=== API Info ==="
+        curl -f http://localhost:5000/api/info || echo "API info failed"
+        
+        echo "=== Database Connection Test ==="
+        docker exec $(docker ps -q -f ancestor=mcr.microsoft.com/mssql/server:${{ env.SQL_SERVER_VERSION }}) \
+          /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'MedicalDevice123!' -d ${{ env.TEST_DATABASE_NAME }} \
+          -Q "SELECT COUNT(*) as TagCount FROM TDocTag; SELECT COUNT(*) as UnitCount FROM TDocUnit;"
+
+    - name: 🛑 Stop API Service
+      if: always()
+      run: |
+        if [ ! -z "$API_PID" ]; then
+          echo "Stopping API service (PID: $API_PID)"
+          kill $API_PID || true
+        fi
+
+    - name: 📄 Publish E2E Test Results
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: End-to-End Test Results
+        path: TestResults/*.trx
+        reporter: dotnet-trx
+        fail-on-error: true
+        max-annotations: 10
+
+    - name: 📁 Upload E2E Test Results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: e2e-test-results
+        path: |
+          TestResults/
+          logs/
+        retention-days: 30
+
+    - name: 📊 Generate E2E Test Summary
+      if: always()
+      id: e2e-summary
+      run: |
+        # Extract test results
+        if [ -f "TestResults/e2e-test-results.trx" ]; then
+          TOTAL_E2E=$(grep -o 'total="[^"]*"' TestResults/e2e-test-results.trx | grep -o '[0-9]*' | head -1 || echo "0")
+          PASSED_E2E=$(grep -o 'passed="[^"]*"' TestResults/e2e-test-results.trx | grep -o '[0-9]*' | head -1 || echo "0")
+          FAILED_E2E=$(grep -o 'failed="[^"]*"' TestResults/e2e-test-results.trx | grep -o '[0-9]*' | head -1 || echo "0")
+          
+          echo "total-e2e-tests=$TOTAL_E2E" >> $GITHUB_OUTPUT
+          echo "passed-e2e-tests=$PASSED_E2E" >> $GITHUB_OUTPUT
+          echo "failed-e2e-tests=$FAILED_E2E" >> $GITHUB_OUTPUT
+        else
+          echo "total-e2e-tests=0" >> $GITHUB_OUTPUT
+          echo "passed-e2e-tests=0" >> $GITHUB_OUTPUT
+          echo "failed-e2e-tests=0" >> $GITHUB_OUTPUT
+        fi
+
+    - name: 💬 Comment E2E Results on PR
+      uses: marocchino/sticky-pull-request-comment@v2
+      if: github.event_name == 'pull_request'
+      with:
+        recreate: false
+        message: |
+          ## 🔄 Medical Device E2E Test Results
+          
+          **Compliance Standard:** ${{ env.COMPLIANCE_STANDARD }}
+          
+          ### 🧪 End-to-End Test Summary
+          - **Total Tests:** ${{ steps.e2e-summary.outputs.total-e2e-tests }}
+          - **Passed:** ${{ steps.e2e-summary.outputs.passed-e2e-tests }}
+          - **Failed:** ${{ steps.e2e-summary.outputs.failed-e2e-tests }}
+          - **Status:** ${{ steps.e2e-summary.outputs.failed-e2e-tests == '0' && '✅ PASSED' || '❌ FAILED' }}
+          
+          ### 🗄️ Database Integration
+          - **Test Database:** ${{ env.TEST_DATABASE_NAME }}
+          - **Schema Initialization:** ✅ Complete
+          - **Test Data:** ✅ Loaded
+          
+          ### 🚀 API Integration
+          - **Service Health:** ${{ job.status == 'success' && '✅ Healthy' || '❌ Unhealthy' }}
+          - **E2E Coverage:** Medical device workflows tested
+          
+          ### 📁 Artifacts
+          - [🧪 E2E Test Results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          
+          ---
+          *E2E Pipeline • Run #${{ github.run_number }} • ${{ github.sha }}<*
+
+  e2e-quality-gate:
+    name: E2E Quality Gate
+    runs-on: ubuntu-latest
+    needs: e2e-tests
+    if: always()
+    
+    steps:
+    - name: 🔍 Evaluate E2E Quality Gate
+      run: |
+        echo "Evaluating E2E Quality Gate for Medical Device Compliance..."
+        
+        E2E_RESULT="${{ needs.e2e-tests.result }}"
+        
+        echo "E2E Tests: $E2E_RESULT"
+        
+        if [[ "$E2E_RESULT" == "success" ]]; then
+          echo "✅ E2E Quality Gate: PASSED"
+          echo "All end-to-end tests passed - Medical device workflows validated"
+        else
+          echo "❌ E2E Quality Gate: FAILED"
+          echo "E2E tests failed - Medical device workflows not validated"
+          exit 1
+        fi
