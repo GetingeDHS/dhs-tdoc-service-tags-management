@@ -14,6 +14,7 @@ COPY src/TagManagement.Infrastructure/*.csproj ./src/TagManagement.Infrastructur
 COPY src/TagManagement.Application/*.csproj ./src/TagManagement.Application/
 COPY tests/TagManagement.UnitTests/*.csproj ./tests/TagManagement.UnitTests/
 COPY tests/TagManagement.E2ETests/*.csproj ./tests/TagManagement.E2ETests/
+COPY tools/TestReporting/*.csproj ./tools/TestReporting/
 
 # Restore NuGet packages
 RUN dotnet restore
