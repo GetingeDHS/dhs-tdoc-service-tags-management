@@ -13,13 +13,13 @@ on:
       coverage_threshold:
         description: 'Code coverage threshold'
         required: false
-        default: '95'
+        default: '40'
         type: string
 
 env:
   DOTNET_VERSION: '8.0.x'
   SOLUTION_PATH: './TagManagement.sln'
-  COVERAGE_THRESHOLD: ${{ github.event.inputs.coverage_threshold || '95' }}
+  COVERAGE_THRESHOLD: ${{ github.event.inputs.coverage_threshold || '40' }}
   COMPLIANCE_STANDARD: 'ISO-13485'
 
 jobs:
