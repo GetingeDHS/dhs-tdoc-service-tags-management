@@ -63,8 +63,6 @@ resource "azurerm_mssql_database" "main" {
   # Serverless configuration - lowest tier for PR testing
   sku_name                    = "GP_S_Gen5_1"
   auto_pause_delay_in_minutes = 60    # Auto-pause after 1 hour of inactivity
-  min_capacity                = 0.5   # Minimum vCores (lowest possible)
-  max_capacity                = 1     # Maximum vCores (keep low for testing)
   
   # Basic backup settings for test environment
   short_term_retention_policy {
