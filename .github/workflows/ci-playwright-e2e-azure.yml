@@ -20,7 +20,7 @@ on:
 
 env:
   DOTNET_VERSION: '8.0.x'
-  AZURE_REGION: 'East US'
+  AZURE_REGION: 'Sweden Central'
   RESOURCE_GROUP_PREFIX: 'rg-tdoc-tags-test'
 
 jobs:

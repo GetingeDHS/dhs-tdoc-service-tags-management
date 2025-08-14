@@ -13,8 +13,8 @@ terraform {
   }
 
   backend "azurerm" {
-    resource_group_name  = "rg-terraform-state"
-    storage_account_name = "stterraformstate"
+    resource_group_name  = "rg-terraform-state-sweden"
+    storage_account_name = "stterraformstatesweden"
     container_name       = "tfstate"
     key                  = "test-environment.tfstate"
   }
@@ -27,7 +27,7 @@ provider "azurerm" {
 locals {
   environment = "test"
   project     = "tdoc-tags"
-  location    = "East US"
+  location    = "Sweden Central"
   
   tags = {
     Environment = local.environment
