@@ -1,7 +1,15 @@
 name: Playwright E2E Tests - Azure Environment
 
-# Disabled automatic triggers: E2E tests only run via manual dispatch
 on:
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/**'
+    paths-ignore:
+      - '**/*.md'
   workflow_dispatch:
     inputs:
       environment:

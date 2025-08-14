@@ -1,7 +1,16 @@
 name: CI - Unit Tests & Coverage
 
-# Disabled automatic triggers: tests only run via manual dispatch
 on:
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '*.sln'
+      - '*.csproj'
+    paths-ignore:
+      - '**/*.md'
   workflow_dispatch:
     inputs:
       coverage_threshold:
