@@ -190,7 +190,14 @@ jobs:
       run: |
         dotnet restore tests/TagManagement.PlaywrightTests/TagManagement.PlaywrightTests.csproj
         dotnet build tests/TagManagement.PlaywrightTests/TagManagement.PlaywrightTests.csproj
-        pwsh tests/TagManagement.PlaywrightTests/bin/Debug/net8.0/playwright.ps1 install --with-deps
+        
+    - name: Install Playwright Browsers
+      run: |
+        # Install Playwright CLI tool globally
+        dotnet tool install --global Microsoft.Playwright.CLI
+        
+        # Install browsers with system dependencies
+        playwright install --with-deps chromium
         
     - name: Configure Playwright for Azure
       run: |
