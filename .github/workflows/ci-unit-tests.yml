@@ -78,7 +78,7 @@ jobs:
           /p:CoverletOutputFormat=cobertura \
           /p:CoverletOutput=./TestResults/ \
           /p:Threshold=${{ env.COVERAGE_THRESHOLD }} \
-          /p:ThresholdType=line,branch,method \
+          "/p:ThresholdType=line,branch,method" \
           /p:ThresholdStat=total
 
     - name: 📊 Install ReportGenerator
