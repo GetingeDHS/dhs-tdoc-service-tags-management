@@ -29,9 +29,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'azure-test')
     outputs:
-      resource-group-name: ${{ steps.terraform-output.outputs.resource_group_name }}
-      app-service-url: ${{ steps.terraform-output.outputs.app_service_url }}
-      app-service-name: ${{ steps.terraform-output.outputs.app_service_name }}
+      resource_group_name: ${{ steps.terraform-output.outputs.resource_group_name }}
+      app_service_url: ${{ steps.terraform-output.outputs.app_service_url }}
+      app_service_name: ${{ steps.terraform-output.outputs.app_service_name }}
       
     steps:
     - name: Checkout code
@@ -146,7 +146,7 @@ jobs:
     - name: Deploy to Azure App Service
       uses: azure/webapps-deploy@v3
       with:
-        app-name: ${{ needs.setup-test-environment.outputs.app-service-name }}
+        app-name: ${{ needs.setup-test-environment.outputs.app_service_name }}
         package: './publish'
         
     - name: Wait for deployment
@@ -206,7 +206,7 @@ jobs:
         {
           "TestSettings": {
             "BaseUrl": "https://localhost:7001",
-            "AzureTestUrl": "${{ needs.setup-test-environment.outputs.app-service-url }}",
+          "AzureTestUrl": "${{ needs.setup-test-environment.outputs.app_service_url }}",
             "Timeout": 60000,
             "BrowserType": "chromium",
             "Headless": true,
@@ -236,7 +236,7 @@ jobs:
           --results-directory ./playwright-results \
           --verbosity normal
       env:
-        AZURE_TEST_URL: ${{ needs.setup-test-environment.outputs.app-service-url }}
+        AZURE_TEST_URL: ${{ needs.setup-test-environment.outputs.app_service_url }}
         
     - name: Upload Playwright report
       uses: actions/upload-artifact@v4
@@ -330,7 +330,7 @@ jobs:
             comment += '- Test artifacts are available for download\n\n';
           }
           
-          comment += `**Test Environment:** ${{ needs.setup-test-environment.outputs.app-service-url }}\n`;
+          comment += `**Test Environment:** ${{ needs.setup-test-environment.outputs.app_service_url }}\n`;
           comment += `**Workflow:** [View Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n\n`;
           comment += '📊 [Download Test Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) | ';
           comment += '🎥 [View Screenshots & Videos](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})';
