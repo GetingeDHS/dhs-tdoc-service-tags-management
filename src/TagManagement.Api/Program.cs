@@ -95,7 +95,7 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 app.MapGet("/api/info", () => new
 {
     service = "Tag Management Service",
-    version = "1.0.4", // Added Azure deployment test endpoints
+    version = "1.0.5", // Fresh branch test: Workflow validation endpoint added
     environment = app.Environment.EnvironmentName,
     complianceStandard = "ISO-13485",
     timestamp = DateTime.UtcNow
@@ -148,7 +148,7 @@ app.MapGet("/api/test/azure-deployment", () => new
     testId = Guid.NewGuid().ToString(),
     deploymentTime = DateTime.UtcNow,
     environment = "Azure Test Environment",
-    version = "1.0.4",
+    version = "1.0.5",
     status = "deployed-and-running",
     healthCheck = "passed",
     databaseConnection = "established",
@@ -166,6 +166,29 @@ app.MapGet("/api/test/environment", (IWebHostEnvironment env) => new
     azureDeployment = true,
     timestamp = DateTime.UtcNow,
     serverInfo = Environment.MachineName
+});
+
+// NEW: Test workflow validation endpoint
+app.MapGet("/api/test/workflow-validation", () => new
+{
+    message = "🚀 Fresh PR workflow validation!",
+    testType = "azure-deployment-test",
+    branchName = "test/azure-deployment-validation",
+    workflowsExpected = new[] { "PR - Unit Tests", "PR - E2E Tests" },
+    validationTime = DateTime.UtcNow,
+    expectedFeatures = new
+    {
+        unitTests = "Fast feedback with coverage",
+        azureDeployment = "Terraform infrastructure provisioning",
+        e2eTests = "Playwright tests against live Azure environment",
+        cleanup = "Automatic resource teardown"
+    },
+    testEndpoints = new[]
+    {
+        "/api/test/azure-deployment",
+        "/api/test/environment", 
+        "/api/test/workflow-validation"
+    }
 });
 
 Log.Information("Starting Tag Management API - Medical Device Service (ISO-13485 Compliant)");
