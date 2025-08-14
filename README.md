@@ -1,4 +1,6 @@
-# Tag Management Microservice
+# Tag Management Service
+
+> Testing Key Vault access permissions for GitHub Actions
 
 [![Build Status](https://github.com/your-org/tag-management/workflows/CI/badge.svg)](https://github.com/your-org/tag-management/actions)
 [![Test Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)](./docs/test-coverage.html)
@@ -226,3 +228,5 @@ The solution maintains the complex business rules from the original Delphi syste
 ## License
 
 This project converts existing Delphi functionality to modern C# and maintains compatibility with the original business requirements.
+#   S e c r e t s   c o n f i g u r e d   f o r   s h a r e d   i n f r a s t r u c t u r e  
+ 

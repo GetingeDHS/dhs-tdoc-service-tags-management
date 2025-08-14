@@ -1,4 +1,4 @@
-name: CI - Unit Tests & Coverage
+name: PR - Unit Tests
 
 on:
   pull_request:
@@ -9,8 +9,6 @@ on:
       - 'tests/**'
       - '*.sln'
       - '*.csproj'
-    paths-ignore:
-      - '**/*.md'
   workflow_dispatch:
     inputs:
       coverage_threshold:

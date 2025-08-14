@@ -50,44 +50,31 @@ resource "azurerm_resource_group" "main" {
   tags     = local.tags
 }
 
-# SQL Server
-resource "azurerm_mssql_server" "main" {
-  name                         = "sql-${local.project}-${local.environment}-${random_string.unique_suffix.result}"
-  resource_group_name          = azurerm_resource_group.main.name
-  location                     = azurerm_resource_group.main.location
-  version                      = "12.0"
-  administrator_login          = var.sql_admin_username
-  administrator_login_password = var.sql_admin_password
-  
-  tags = local.tags
-}
+# Use shared SQL Server from production infrastructure
+# No need to create a new SQL Server - use the shared one
 
-# SQL Database
+# SQL Database (Serverless for cost-effective testing)
 resource "azurerm_mssql_database" "main" {
-  name           = "sqldb-${local.project}-${local.environment}"
-  server_id      = azurerm_mssql_server.main.id
+  name           = "sqldb-${local.project}-${local.environment}-${random_string.unique_suffix.result}"
+  server_id      = var.shared_sql_server_id
   collation      = "SQL_Latin1_General_CP1_CI_AS"
-  license_type   = "LicenseIncluded"
-  max_size_gb    = 2
-  sku_name       = "S0"
+  
+  # Basic SKU for simple, reliable test environment
+  sku_name = "Basic"
+  max_size_gb = 2
+  
+  # Basic backup settings for test environment
+  short_term_retention_policy {
+    retention_days = 7  # Minimal retention for test environment
+  }
+  
+  # No long-term retention needed for test databases
   
   tags = local.tags
 }
 
-# SQL Server Firewall Rules
-resource "azurerm_mssql_firewall_rule" "allow_azure_services" {
-  name             = "AllowAzureServices"
-  server_id        = azurerm_mssql_server.main.id
-  start_ip_address = "0.0.0.0"
-  end_ip_address   = "0.0.0.0"
-}
-
-resource "azurerm_mssql_firewall_rule" "allow_github_actions" {
-  name             = "AllowGitHubActions"
-  server_id        = azurerm_mssql_server.main.id
-  start_ip_address = "0.0.0.0"
-  end_ip_address   = "255.255.255.255"
-}
+# Note: Firewall rules are already configured on the shared SQL Server
+# No need to add additional firewall rules here
 
 # App Service Plan
 resource "azurerm_service_plan" "main" {
@@ -120,10 +107,16 @@ resource "azurerm_linux_web_app" "main" {
   }
   
   app_settings = {
-    "ConnectionStrings__DefaultConnection" = "Server=tcp:${azurerm_mssql_server.main.fully_qualified_domain_name},1433;Initial Catalog=${azurerm_mssql_database.main.name};Persist Security Info=False;User ID=${var.sql_admin_username};Password=${var.sql_admin_password};MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
     "ASPNETCORE_ENVIRONMENT" = "Testing"
     "Logging__LogLevel__Default" = "Information"
     "AllowedHosts" = "*"
+    "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.main.connection_string
+    
+    # Database connection components - app will build connection string at runtime
+    "DATABASE_NAME" = azurerm_mssql_database.main.name
+    "SQL_SERVER_FQDN" = "@Microsoft.KeyVault(VaultName=${var.shared_key_vault_name};SecretName=tagmgmt-sql-server-fqdn)"
+    "SQL_USERNAME" = "@Microsoft.KeyVault(VaultName=${var.shared_key_vault_name};SecretName=tagmgmt-sql-admin-username)"
+    "SQL_PASSWORD" = "@Microsoft.KeyVault(VaultName=${var.shared_key_vault_name};SecretName=tagmgmt-sql-admin-password)"
   }
   
   identity {
@@ -147,27 +140,42 @@ resource "azurerm_application_insights" "main" {
   tags = local.tags
 }
 
-# Key Vault for storing secrets
-resource "azurerm_key_vault" "main" {
-  name                = "kv-${substr(replace("${local.project}-${random_string.unique_suffix.result}", "_", "-"), 0, 21)}"
-  location            = azurerm_resource_group.main.location
-  resource_group_name = azurerm_resource_group.main.name
-  tenant_id           = data.azurerm_client_config.current.tenant_id
-  sku_name            = "standard"
-  
-  tags = local.tags
-}
-
 data "azurerm_client_config" "current" {}
 
-# Key Vault Access Policy
+# Reference to shared Key Vault from production infrastructure
+data "azurerm_key_vault" "shared" {
+  name                = var.shared_key_vault_name
+  resource_group_name = var.shared_resource_group_name
+}
+
+# Get Tag Management SQL Server credentials from shared Key Vault
+data "azurerm_key_vault_secret" "tagmgmt_sql_server_fqdn" {
+  name         = "tagmgmt-sql-server-fqdn"
+  key_vault_id = data.azurerm_key_vault.shared.id
+}
+
+data "azurerm_key_vault_secret" "tagmgmt_sql_admin_username" {
+  name         = "tagmgmt-sql-admin-username"
+  key_vault_id = data.azurerm_key_vault.shared.id
+}
+
+data "azurerm_key_vault_secret" "tagmgmt_sql_admin_password" {
+  name         = "tagmgmt-sql-admin-password"
+  key_vault_id = data.azurerm_key_vault.shared.id
+}
+
+# Grant the App Service access to the shared Key Vault
 resource "azurerm_key_vault_access_policy" "app_service" {
-  key_vault_id = azurerm_key_vault.main.id
+  key_vault_id = data.azurerm_key_vault.shared.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
   object_id    = azurerm_linux_web_app.main.identity[0].principal_id
 
   secret_permissions = ["Get", "List"]
 }
+
+# Note: Application builds connection string at runtime from:
+# - Key Vault secrets: SQL server FQDN, username, password  
+# - Environment variable: DATABASE_NAME (unique per PR)
 
 
 # Outputs
@@ -186,18 +194,23 @@ output "app_service_url" {
   value       = "https://${azurerm_linux_web_app.main.default_hostname}"
 }
 
-output "sql_server_name" {
-  description = "Name of the SQL server"
-  value       = azurerm_mssql_server.main.name
+output "sql_server_fqdn" {
+  description = "FQDN of the shared SQL server"
+  value       = data.azurerm_key_vault_secret.tagmgmt_sql_server_fqdn.value
+  sensitive   = true
 }
 
 output "sql_database_name" {
-  description = "Name of the SQL database"
+  description = "Name of the test SQL database"
   value       = azurerm_mssql_database.main.name
 }
 
-output "connection_string" {
-  description = "Database connection string"
-  value       = "Server=tcp:${azurerm_mssql_server.main.fully_qualified_domain_name},1433;Initial Catalog=${azurerm_mssql_database.main.name};Persist Security Info=False;User ID=${var.sql_admin_username};Password=${var.sql_admin_password};MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
-  sensitive   = true
+output "connection_string_template" {
+  description = "Shared connection string template from Key Vault"
+  value       = "tagmgmt-test-connection-string"
+}
+
+output "key_vault_secret_name" {
+  description = "Name of the shared Key Vault secret containing the connection string template"
+  value       = "tagmgmt-test-connection-string"
 }

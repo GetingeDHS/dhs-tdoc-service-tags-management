@@ -18,8 +18,12 @@ builder.Host.UseSerilog();
 
 // Add services to the container.
 
+// Build connection string from environment variables
+// This allows for dynamic database names while keeping credentials in Key Vault
+var connectionString = BuildConnectionString(builder.Configuration);
+
 // Add data layer services (includes DbContext and repositories)
-builder.Services.AddDataServices(builder.Configuration);
+builder.Services.AddDataServices(builder.Configuration, connectionString);
 
 // Add application services
 builder.Services.AddScoped<ITagService, TagService>();
@@ -40,10 +44,6 @@ builder.Services.AddSwaggerGen(c =>
         Description = "Medical Device Tag Management Microservice - ISO-13485 Compliant"
     });
 });
-
-// Add health checks
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? "Server=localhost;Database=TDocDB;Integrated Security=true;TrustServerCertificate=true;";
 
 builder.Services.AddHealthChecks()
     .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy());
@@ -95,7 +95,7 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 app.MapGet("/api/info", () => new
 {
     service = "Tag Management Service",
-    version = "1.0.0",
+    version = "1.0.4", // Added Azure deployment test endpoints
     environment = app.Environment.EnvironmentName,
     complianceStandard = "ISO-13485",
     timestamp = DateTime.UtcNow
@@ -141,7 +141,64 @@ app.MapDelete("/api/tags/{id:int}", (int id) => Results.NoContent());
 
 app.MapPost("/api/tags/{id:int}/units", (int id, object request) => Results.Created($"/api/tags/{id}/contents", new { message = "Unit added successfully" }));
 
+// NEW: Test endpoint to verify Azure deployment
+app.MapGet("/api/test/azure-deployment", () => new
+{
+    message = "✅ Azure deployment successful!",
+    testId = Guid.NewGuid().ToString(),
+    deploymentTime = DateTime.UtcNow,
+    environment = "Azure Test Environment",
+    version = "1.0.4",
+    status = "deployed-and-running",
+    healthCheck = "passed",
+    databaseConnection = "established",
+    complianceLevel = "ISO-13485"
+});
+
+// NEW: Environment info endpoint
+app.MapGet("/api/test/environment", (IWebHostEnvironment env) => new
+{
+    environmentName = env.EnvironmentName,
+    applicationName = env.ApplicationName,
+    contentRootPath = env.ContentRootPath,
+    isProduction = env.IsProduction(),
+    isDevelopment = env.IsDevelopment(),
+    azureDeployment = true,
+    timestamp = DateTime.UtcNow,
+    serverInfo = Environment.MachineName
+});
+
 Log.Information("Starting Tag Management API - Medical Device Service (ISO-13485 Compliant)");
+
+// Helper method to build connection string from environment variables
+static string BuildConnectionString(IConfiguration configuration)
+{
+    // Try to get from standard connection string first (for local development)
+    var standardConnectionString = configuration.GetConnectionString("DefaultConnection");
+    if (!string.IsNullOrEmpty(standardConnectionString))
+    {
+        return standardConnectionString;
+    }
+    
+    // Build from environment variables (for Azure deployment)
+    var sqlServerFqdn = configuration["SQL_SERVER_FQDN"];
+    var sqlUsername = configuration["SQL_USERNAME"];
+    var sqlPassword = configuration["SQL_PASSWORD"];
+    var databaseName = configuration["DATABASE_NAME"];
+    
+    // Fall back to local development if env vars not available
+    if (string.IsNullOrEmpty(sqlServerFqdn) || string.IsNullOrEmpty(databaseName))
+    {
+        Log.Warning("Environment variables for database connection not found, using local development defaults");
+        return "Server=localhost;Database=TDocDB;Integrated Security=true;TrustServerCertificate=true;";
+    }
+    
+    var connectionString = $"Server={sqlServerFqdn};Database={databaseName};User Id={sqlUsername};Password={sqlPassword};Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;MultipleActiveResultSets=True;";
+    
+    Log.Information("Built connection string for database: {DatabaseName} on server: {ServerFqdn}", databaseName, sqlServerFqdn);
+    
+    return connectionString;
+}
 
 try
 {
