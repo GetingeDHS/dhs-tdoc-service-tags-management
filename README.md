@@ -226,3 +226,5 @@ The solution maintains the complex business rules from the original Delphi syste
 ## License
 
 This project converts existing Delphi functionality to modern C# and maintains compatibility with the original business requirements.
+#   S e c r e t s   c o n f i g u r e d   f o r   s h a r e d   i n f r a s t r u c t u r e  
+ 
