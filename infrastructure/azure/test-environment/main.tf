@@ -145,7 +145,7 @@ resource "azurerm_application_insights" "main" {
 
 # Key Vault for storing secrets
 resource "azurerm_key_vault" "main" {
-  name                = "kv-${local.project}-${local.environment}-${random_string.unique_suffix.result}"
+  name                = "kv-${substr(replace("${local.project}-${random_string.unique_suffix.result}", "_", "-"), 0, 21)}"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
   tenant_id           = data.azurerm_client_config.current.tenant_id
