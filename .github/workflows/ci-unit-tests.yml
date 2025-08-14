@@ -135,7 +135,7 @@ jobs:
         max-annotations: 10
 
     - name: 📁 Upload Test Results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: unit-test-results
@@ -145,7 +145,7 @@ jobs:
         retention-days: 30
 
     - name: 📁 Upload Coverage Reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: coverage-reports
@@ -242,7 +242,7 @@ jobs:
           --self-contained false
 
     - name: 📁 Upload Test Report Generator
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: test-report-generator
         path: artifacts/TestReporting/
