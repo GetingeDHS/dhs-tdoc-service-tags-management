@@ -1,0 +1,43 @@
+Summary
+  Generated on: 14-08-2025 - 09:12:18
+  Coverage date: 14-08-2025 - 09:11:26
+  Parser: Cobertura
+  Assemblies: 2
+  Classes: 19
+  Files: 19
+  Line coverage: 45.2%
+  Covered lines: 525
+  Uncovered lines: 634
+  Coverable lines: 1159
+  Total lines: 2075
+  Branch coverage: 50.9% (77 of 151)
+  Covered branches: 77
+  Total branches: 151
+  Method coverage: 43.4% (119 of 274)
+  Full method coverage: 41.6% (114 of 274)
+  Covered methods: 119
+  Fully covered methods: 114
+  Total methods: 274
+
+TagManagement.Core                                                          68.9%
+  TagManagement.Core.Entities.Customer                                       100%
+  TagManagement.Core.Entities.Product                                        100%
+  TagManagement.Core.Entities.Tag                                           90.6%
+  TagManagement.Core.Entities.TagContents                                   21.4%
+  TagManagement.Core.Entities.TagItem                                       42.3%
+  TagManagement.Core.Entities.Unit                                           100%
+  TagManagement.Core.Enums.TagTypeExtensions                                 100%
+
+TagManagement.Infrastructure                                                41.4%
+  TagManagement.Infrastructure.DependencyInjection                             0%
+  TagManagement.Infrastructure.Persistence.Models.CustomerModel                0%
+  TagManagement.Infrastructure.Persistence.Models.IndicatorModel               0%
+  TagManagement.Infrastructure.Persistence.Models.ItemModel                    0%
+  TagManagement.Infrastructure.Persistence.Models.LocationModel             53.3%
+  TagManagement.Infrastructure.Persistence.Models.TagContentModel           52.6%
+  TagManagement.Infrastructure.Persistence.Models.TagsModel                 76.9%
+  TagManagement.Infrastructure.Persistence.Models.TagTypeModel              44.4%
+  TagManagement.Infrastructure.Persistence.Models.UnitModel                    0%
+  TagManagement.Infrastructure.Persistence.Repositories.TagRepository          0%
+  TagManagement.Infrastructure.Persistence.Repositories.TDocTagRepository   47.9%
+  TagManagement.Infrastructure.Persistence.TagManagementDbContext            100%

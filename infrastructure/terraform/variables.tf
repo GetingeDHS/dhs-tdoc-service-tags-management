@@ -247,3 +247,14 @@ variable "data_residency_region" {
     error_message = "Data residency must be one of: US, EU, UK, CA, AU."
   }
 }
+
+# Shared Key Vault configuration from dhs-aire-infrastructure
+variable "shared_key_vault_name" {
+  description = "Name of the shared Key Vault from dhs-aire-infrastructure"
+  type        = string
+}
+
+variable "shared_resource_group_name" {
+  description = "Name of the shared resource group containing the Key Vault from dhs-aire-infrastructure"
+  type        = string
+}

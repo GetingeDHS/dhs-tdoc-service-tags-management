@@ -364,3 +364,14 @@ docker-compose.override.yml
 .Trashes
 ehthumbs.db
 [Tt]humbs.db
+
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars.backup
+crash.log
+crash.*.log
+.terraform.tfstate.lock.info

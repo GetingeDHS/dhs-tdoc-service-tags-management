@@ -98,44 +98,25 @@ resource "azurerm_application_insights" "main" {
   tags = local.common_tags
 }
 
-# Key Vault for secrets (medical device security requirement)
-resource "azurerm_key_vault" "main" {
-  name                       = "${local.prefix}-kv-${local.suffix}"
-  location                   = azurerm_resource_group.main.location
-  resource_group_name        = azurerm_resource_group.main.name
-  tenant_id                  = data.azurerm_client_config.current.tenant_id
-  sku_name                   = "premium"
-  soft_delete_retention_days = 7
-  purge_protection_enabled   = var.environment == "prod" ? true : false
-  
-  # Enable logging for compliance
-  contact {
-    email = var.security_contact_email
-  }
-  
-  tags = local.common_tags
+# Reference to shared Key Vault from dhs-aire-infrastructure
+data "azurerm_key_vault" "shared" {
+  name                = var.shared_key_vault_name
+  resource_group_name = var.shared_resource_group_name
 }
 
-# Key Vault Access Policy for current user/service principal
-resource "azurerm_key_vault_access_policy" "terraform" {
-  key_vault_id = azurerm_key_vault.main.id
+# Access policy for this project's service principal to access shared Key Vault
+resource "azurerm_key_vault_access_policy" "tagmanagement_terraform" {
+  key_vault_id = data.azurerm_key_vault.shared.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
   object_id    = data.azurerm_client_config.current.object_id
   
   secret_permissions = [
     "Get", "List", "Set", "Delete", "Purge", "Recover"
   ]
-  
-  certificate_permissions = [
-    "Get", "List", "Create", "Import", "Delete", "Purge", "Recover"
-  ]
-  
-  key_permissions = [
-    "Get", "List", "Create", "Delete", "Purge", "Recover", "Sign", "Verify"
-  ]
 }
 
-# SQL Server
+# Lightweight SQL Server optimized for serverless databases only
+# This has minimal overhead and only serves as a container for serverless databases
 resource "azurerm_mssql_server" "main" {
   name                         = "${local.prefix}-sql-${local.suffix}"
   resource_group_name          = azurerm_resource_group.main.name
@@ -147,12 +128,13 @@ resource "azurerm_mssql_server" "main" {
   # Security configurations for medical device compliance
   minimum_tls_version = "1.2"
   
-  azuread_administrator {
-    login_username = var.sql_aad_admin_login
-    object_id      = var.sql_aad_admin_object_id
-  }
+  # Disable AAD admin for POC to reduce complexity and cost
+  # azuread_administrator can be added later if needed
   
-  tags = local.common_tags
+  tags = merge(local.common_tags, {
+    Purpose = "Serverless Database Host"
+    Note    = "Lightweight server for serverless databases only"
+  })
 }
 
 # SQL Server Firewall Rule for Azure Services
@@ -163,69 +145,32 @@ resource "azurerm_mssql_firewall_rule" "azure_services" {
   end_ip_address   = "0.0.0.0"
 }
 
-# SQL Database
+# SQL Database (Serverless for cost-effective POC)
 resource "azurerm_mssql_database" "main" {
   name         = "TDOC"
   server_id    = azurerm_mssql_server.main.id
   collation    = "SQL_Latin1_General_CP1_CI_AS"
   license_type = "LicenseIncluded"
-  sku_name     = var.sql_database_sku
   
-  # Backup and compliance settings
+  # Serverless configuration - lowest tier for POC
+  sku_name                    = "GP_S_Gen5_1"
+  auto_pause_delay_in_minutes = 60    # Auto-pause after 1 hour of inactivity
+  min_capacity                = 0.5   # Minimum vCores (lowest possible)
+  max_capacity                = 1     # Maximum vCores (keep low for POC)
+  
+  # Basic backup settings for POC (reduced from production settings)
   short_term_retention_policy {
-    retention_days = 35
+    retention_days = 7  # Reduced from 35 for POC
   }
   
-  long_term_retention_policy {
-    weekly_retention  = "P1M"
-    monthly_retention = "P12M"
-    yearly_retention  = "P7Y"
-    week_of_year      = 1
-  }
+  # Skip long-term retention for POC to reduce costs
+  # long_term_retention_policy can be added later if needed
   
   tags = local.common_tags
 }
 
-# SQL Server Auditing (medical device compliance requirement)
-resource "azurerm_mssql_server_extended_auditing_policy" "main" {
-  server_id                               = azurerm_mssql_server.main.id
-  storage_endpoint                        = azurerm_storage_account.audit_logs.primary_blob_endpoint
-  storage_account_access_key              = azurerm_storage_account.audit_logs.primary_access_key
-  storage_account_access_key_is_secondary = false
-  retention_in_days                       = var.audit_retention_days
-  
-  depends_on = [
-    azurerm_role_assignment.audit_logs
-  ]
-}
-
-# Storage Account for audit logs
-resource "azurerm_storage_account" "audit_logs" {
-  name                     = "${replace(local.prefix, "-", "")}audit${local.suffix}"
-  resource_group_name      = azurerm_resource_group.main.name
-  location                 = azurerm_resource_group.main.location
-  account_tier             = "Standard"
-  account_replication_type = "GRS"
-  min_tls_version          = "TLS1_2"
-  
-  # Security settings for medical device compliance
-  allow_nested_items_to_be_public = false
-  
-  blob_properties {
-    delete_retention_policy {
-      days = var.audit_retention_days
-    }
-  }
-  
-  tags = local.common_tags
-}
-
-# Role assignment for SQL Server to access audit storage
-resource "azurerm_role_assignment" "audit_logs" {
-  scope                = azurerm_storage_account.audit_logs.id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_mssql_server.main.identity[0].principal_id
-}
+# Note: SQL Server auditing removed for POC to reduce costs and complexity
+# For production deployment, uncomment and configure auditing as needed
 
 # Container Registry for microservice images
 resource "azurerm_container_registry" "main" {
@@ -421,4 +366,78 @@ resource "azurerm_monitor_metric_alert" "database_connection_failed" {
   }
   
   tags = local.common_tags
+}
+
+# Store Tag Management SQL Server information in shared Key Vault for PR environments
+resource "azurerm_key_vault_secret" "tagmgmt_sql_server_fqdn" {
+  name         = "tagmgmt-sql-server-fqdn"
+  value        = azurerm_mssql_server.main.fully_qualified_domain_name
+  key_vault_id = data.azurerm_key_vault.shared.id
+  
+  depends_on = [
+    azurerm_key_vault_access_policy.tagmanagement_terraform
+  ]
+  
+  tags = local.common_tags
+}
+
+resource "azurerm_key_vault_secret" "tagmgmt_sql_admin_username" {
+  name         = "tagmgmt-sql-admin-username"
+  value        = var.sql_admin_username
+  key_vault_id = data.azurerm_key_vault.shared.id
+  
+  depends_on = [
+    azurerm_key_vault_access_policy.tagmanagement_terraform
+  ]
+  
+  tags = local.common_tags
+}
+
+resource "azurerm_key_vault_secret" "tagmgmt_sql_admin_password" {
+  name         = "tagmgmt-sql-admin-password"
+  value        = var.sql_admin_password
+  key_vault_id = data.azurerm_key_vault.shared.id
+  
+  depends_on = [
+    azurerm_key_vault_access_policy.tagmanagement_terraform
+  ]
+  
+  tags = local.common_tags
+}
+
+# Outputs for shared resources (SQL Server and Key Vault)
+output "shared_sql_server_id" {
+  description = "ID of the shared SQL Server for PR test environments"
+  value       = azurerm_mssql_server.main.id
+}
+
+output "shared_sql_server_name" {
+  description = "Name of the shared SQL Server for PR test environments"
+  value       = azurerm_mssql_server.main.name
+}
+
+output "shared_sql_server_fqdn" {
+  description = "FQDN of the shared SQL Server for PR test environments"
+  value       = azurerm_mssql_server.main.fully_qualified_domain_name
+  sensitive   = true
+}
+
+output "shared_key_vault_id" {
+  description = "ID of the shared Key Vault for PR test environments"
+  value       = data.azurerm_key_vault.shared.id
+}
+
+output "shared_key_vault_name" {
+  description = "Name of the shared Key Vault for PR test environments"
+  value       = data.azurerm_key_vault.shared.name
+}
+
+output "shared_key_vault_vault_uri" {
+  description = "URI of the shared Key Vault for PR test environments"
+  value       = data.azurerm_key_vault.shared.vault_uri
+}
+
+output "shared_key_vault_resource_group_name" {
+  description = "Name of the resource group containing shared Key Vault"
+  value       = data.azurerm_key_vault.shared.resource_group_name
 }
