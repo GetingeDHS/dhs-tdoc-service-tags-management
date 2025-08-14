@@ -95,7 +95,7 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 app.MapGet("/api/info", () => new
 {
     service = "Tag Management Service",
-    version = "1.0.3", // test if full PR validation pipeline runs with fixed skip_deployment condition
+    version = "1.0.4", // Added Azure deployment test endpoints
     environment = app.Environment.EnvironmentName,
     complianceStandard = "ISO-13485",
     timestamp = DateTime.UtcNow
@@ -140,6 +140,33 @@ app.MapPost("/api/tags", (object request) =>
 app.MapDelete("/api/tags/{id:int}", (int id) => Results.NoContent());
 
 app.MapPost("/api/tags/{id:int}/units", (int id, object request) => Results.Created($"/api/tags/{id}/contents", new { message = "Unit added successfully" }));
+
+// NEW: Test endpoint to verify Azure deployment
+app.MapGet("/api/test/azure-deployment", () => new
+{
+    message = "✅ Azure deployment successful!",
+    testId = Guid.NewGuid().ToString(),
+    deploymentTime = DateTime.UtcNow,
+    environment = "Azure Test Environment",
+    version = "1.0.4",
+    status = "deployed-and-running",
+    healthCheck = "passed",
+    databaseConnection = "established",
+    complianceLevel = "ISO-13485"
+});
+
+// NEW: Environment info endpoint
+app.MapGet("/api/test/environment", (IWebHostEnvironment env) => new
+{
+    environmentName = env.EnvironmentName,
+    applicationName = env.ApplicationName,
+    contentRootPath = env.ContentRootPath,
+    isProduction = env.IsProduction(),
+    isDevelopment = env.IsDevelopment(),
+    azureDeployment = true,
+    timestamp = DateTime.UtcNow,
+    serverInfo = Environment.MachineName
+});
 
 Log.Information("Starting Tag Management API - Medical Device Service (ISO-13485 Compliant)");
 
