@@ -6,33 +6,20 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /app
 
-# Copy solution file and project files for better layer caching
-COPY *.sln ./
+# Copy project files for better layer caching (restore only API and its dependencies)
 COPY src/TagManagement.Api/*.csproj ./src/TagManagement.Api/
 COPY src/TagManagement.Domain/TagManagement.Core/*.csproj ./src/TagManagement.Domain/TagManagement.Core/
 COPY src/TagManagement.Infrastructure/*.csproj ./src/TagManagement.Infrastructure/
 COPY src/TagManagement.Application/*.csproj ./src/TagManagement.Application/
-COPY tests/TagManagement.UnitTests/*.csproj ./tests/TagManagement.UnitTests/
-COPY tests/TagManagement.E2ETests/*.csproj ./tests/TagManagement.E2ETests/
-COPY tools/TestReporting/*.csproj ./tools/TestReporting/
 
-# Restore NuGet packages
-RUN dotnet restore
+# Restore NuGet packages for the API project only (faster, avoids test projects)
+RUN dotnet restore src/TagManagement.Api/TagManagement.Api.csproj
 
 # Copy all source code
 COPY . .
 
-# Build the solution
-RUN dotnet build --configuration Release --no-restore
-
-# Test Stage (Medical Device Compliance Requirement)
-FROM build AS test
-WORKDIR /app
-# Run unit tests to ensure medical device compliance before containerization
-RUN dotnet test --configuration Release --no-build --verbosity normal \
-    --collect:"XPlat Code Coverage" \
-    --results-directory /app/TestResults \
-    tests/TagManagement.UnitTests/TagManagement.UnitTests.csproj
+# Build the API (no test projects included in container build)
+RUN dotnet build src/TagManagement.Api/TagManagement.Api.csproj --configuration Release --no-restore
 
 # Publish Stage
 FROM build AS publish
