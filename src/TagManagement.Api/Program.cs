@@ -95,7 +95,7 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 app.MapGet("/api/info", () => new
 {
     service = "Tag Management Service",
-    version = "1.0.1", // bump patch to validate PR pipeline
+    version = "1.0.2", // bump again to trigger synchronize and validate re-run
     environment = app.Environment.EnvironmentName,
     complianceStandard = "ISO-13485",
     timestamp = DateTime.UtcNow
