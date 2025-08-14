@@ -29,9 +29,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'azure-test')
     outputs:
-      resource_group_name: ${{ steps.terraform-output.outputs.resource_group_name }}
-      app_service_url: ${{ steps.terraform-output.outputs.app_service_url }}
-      app_service_name: ${{ steps.terraform-output.outputs.app_service_name }}
+      resource_group_name: ${{ steps.terraform_output.outputs.resource_group_name }}
+      app_service_url: ${{ steps.terraform_output.outputs.app_service_url }}
+      app_service_name: ${{ steps.terraform_output.outputs.app_service_name }}
       
     steps:
     - name: Checkout code
@@ -87,7 +87,7 @@ jobs:
         ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
         
     - name: Get Terraform Outputs
-      id: terraform-output
+      id: terraform_output
       working-directory: ./infrastructure/azure/test-environment
       run: |
         echo "resource_group_name=$(terraform output -raw resource_group_name)" >> $GITHUB_OUTPUT
