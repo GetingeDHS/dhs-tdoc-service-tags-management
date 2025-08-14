@@ -119,7 +119,7 @@ jobs:
     name: Azure E2E Validation
     runs-on: ubuntu-latest
     needs: unit-tests-and-build
-    if: needs.unit-tests-and-build.outputs.build-successful == 'true' && (github.event.inputs.skip_deployment != 'true')
+    if: needs.unit-tests-and-build.outputs.build-successful == 'true' && (github.event_name == 'pull_request' || github.event.inputs.skip_deployment != 'true')
     
     outputs:
       resource_group_name: ${{ steps.terraform_output.outputs.resource_group_name }}
