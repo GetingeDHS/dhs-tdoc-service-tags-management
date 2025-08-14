@@ -54,28 +54,28 @@ jobs:
       deployment_successful: ${{ steps.deployment-result.outputs.success }}
       
     steps:
-    - name: 🔄 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: ⚙️ Setup Terraform
+    - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: 1.5.0
         terraform_wrapper: false
         
-    - name: 🔐 Azure Login
+    - name: Azure Login
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
         
-    - name: 🎲 Generate Unique Suffix
+    - name: Generate Unique Suffix
       id: unique-suffix
       run: |
         SUFFIX=$(echo "${{ github.run_id }}" | tail -c 9)
         echo "suffix=${SUFFIX}" >> $GITHUB_OUTPUT
         echo "Using suffix: ${SUFFIX}"
         
-    - name: 🏗️ Deploy Test Infrastructure
+    - name: Deploy Test Infrastructure
       working-directory: ./infrastructure/azure/test-environment
       run: |
         terraform init
@@ -94,7 +94,7 @@ jobs:
         ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
         ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
         
-    - name: 📤 Get Terraform Outputs
+    - name: Get Terraform Outputs
       id: terraform_output
       working-directory: ./infrastructure/azure/test-environment
       env:
@@ -110,41 +110,41 @@ jobs:
         echo "sql_database_name=$(terraform output -raw sql_database_name 2>/dev/null || terraform output sql_database_name | tr -d '"')" >> $GITHUB_OUTPUT
         
         # Debug: Print outputs to verify they're captured
-        echo "🔍 Debug: Captured outputs:"
+        echo "Debug: Captured outputs:"
         echo "  resource_group_name: $(terraform output -raw resource_group_name 2>/dev/null || terraform output resource_group_name | tr -d '"')"
         echo "  app_service_url: $(terraform output -raw app_service_url 2>/dev/null || terraform output app_service_url | tr -d '"')"
         echo "  app_service_name: $(terraform output -raw app_service_name 2>/dev/null || terraform output app_service_name | tr -d '"')"
         echo "  sql_database_name: $(terraform output -raw sql_database_name 2>/dev/null || terraform output sql_database_name | tr -d '"')"
 
-    - name: ⚙️ Setup .NET for Deployment
+    - name: Setup .NET for Deployment
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
         
-    - name: 🔧 Restore & Build Application
+    - name: Restore & Build Application
       run: |
         dotnet restore
         dotnet build --configuration Release --no-restore
         
-    - name: 📦 Publish Application
+    - name: Publish Application
       run: |
         dotnet publish src/TagManagement.Api/TagManagement.Api.csproj \
           --configuration Release \
           --no-build \
           --output ./publish
           
-    - name: 🚀 Deploy to Azure App Service
+    - name: Deploy to Azure App Service
       uses: azure/webapps-deploy@v3
       with:
         app-name: ${{ steps.terraform_output.outputs.app_service_name }}
         package: './publish'
         
-    - name: ⏳ Wait for Deployment
+    - name: Wait for Deployment
       run: |
         echo "Waiting for deployment to complete..."
         sleep 45
         
-    - name: 🏥 Health Check
+    - name: Health Check
       run: |
         MAX_ATTEMPTS=12
         ATTEMPT=1
@@ -153,20 +153,20 @@ jobs:
           echo "Health check attempt $ATTEMPT/$MAX_ATTEMPTS..."
           
           if curl -f -s "${{ steps.terraform_output.outputs.app_service_url }}/health" > /dev/null; then
-            echo "✅ Application is healthy!"
+            echo "Application is healthy!"
             break
           else
             if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-              echo "❌ Application failed health check after $MAX_ATTEMPTS attempts"
+              echo "Application failed health check after $MAX_ATTEMPTS attempts"
               exit 1
             fi
-            echo "⏳ Waiting 20 seconds before retry..."
+            echo "Waiting 20 seconds before retry..."
             sleep 20
             ATTEMPT=$((ATTEMPT + 1))
           fi
         done
 
-    - name: ✅ Deployment Result
+    - name: Deployment Result
       id: deployment-result
       run: echo "success=true" >> $GITHUB_OUTPUT
 
@@ -178,21 +178,21 @@ jobs:
     if: needs.azure-e2e-validation.outputs.deployment_successful == 'true'
     
     steps:
-    - name: 🔄 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: ⚙️ Setup .NET
+    - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
-    - name: 🎭 Setup Playwright Tests
+    - name: Setup Playwright Tests
       run: |
         dotnet restore tests/TagManagement.PlaywrightTests/TagManagement.PlaywrightTests.csproj
         dotnet build tests/TagManagement.PlaywrightTests/TagManagement.PlaywrightTests.csproj
         pwsh tests/TagManagement.PlaywrightTests/bin/Debug/net8.0/playwright.ps1 install --with-deps
         
-    - name: ⚙️ Configure Playwright for Azure
+    - name: Configure Playwright for Azure
       run: |
         cd tests/TagManagement.PlaywrightTests
         cat > appsettings.json << EOF
@@ -221,7 +221,7 @@ jobs:
         }
         EOF
         
-    - name: 🎭 Run Playwright Tests against Azure
+    - name: Run Playwright Tests against Azure
       run: |
         dotnet test tests/TagManagement.PlaywrightTests/TagManagement.PlaywrightTests.csproj \
           --configuration Debug \
@@ -231,7 +231,7 @@ jobs:
       env:
         AZURE_TEST_URL: ${{ needs.azure-e2e-validation.outputs.app_service_url }}
 
-    - name: 📁 Upload Playwright Test Results
+    - name: Upload Playwright Test Results
       uses: actions/upload-artifact@v4
       if: always()
       with:
@@ -250,21 +250,21 @@ jobs:
     if: always() && needs.azure-e2e-validation.outputs.deployment_successful == 'true'
     
     steps:
-    - name: 🔄 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: ⚙️ Setup Terraform
+    - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: 1.5.0
         terraform_wrapper: false
         
-    - name: 🔐 Azure Login
+    - name: Azure Login
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
         
-    - name: 🧹 Destroy Test Infrastructure
+    - name: Destroy Test Infrastructure
       working-directory: ./infrastructure/azure/test-environment
       run: |
         terraform init
@@ -286,7 +286,7 @@ jobs:
     if: always() && github.event_name == 'pull_request'
     
     steps:
-    - name: 💬 Update PR with Smart Status Comment
+    - name: Update PR with Smart Status Comment
       uses: actions/github-script@v7
       with:
         script: |
@@ -315,43 +315,43 @@ jobs:
           });
           
           const botComments = comments.filter(comment => 
-            comment.user.type === 'Bot' && comment.body.includes('🚀 PR Validation')
+            comment.user.type === 'Bot' && comment.body.includes('E2E Validation')
           );
           
           let comment = '';
           
           if (allPassed) {
             // Success summary - concise and positive
-            comment = `## ✅ E2E Validation Passed!
+            comment = `## E2E Validation Passed!
 
 All E2E validation checks completed successfully:
 
-- ✅ **Azure Deployment** (${deploymentResult})
-- ✅ **Playwright E2E Tests** (${e2eResult})
+- **Azure Deployment** (${deploymentResult})
+- **Playwright E2E Tests** (${e2eResult})
 
-🎉 **Azure deployment and E2E tests successful!**
+**Azure deployment and E2E tests successful!**
 
 ---
 *Run #${{ github.run_number }} • [View Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})*`;
           } else {
             // Failure summary - focus on what failed
-            comment = `## ❌ E2E Validation Failed
+            comment = `## E2E Validation Failed
 
 **Failed Checks:**
 `;
             
             if (deploymentResult === 'failure') {
-              comment += `- ❌ **Azure Deployment** - [View Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
+              comment += `- **Azure Deployment** - [View Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
             }
             if (e2eResult === 'failure') {
-              comment += `- ❌ **E2E Tests** - [View Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
+              comment += `- **E2E Tests** - [View Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
             }
             
             comment += `\n**Passed Checks:**\n`;
-            if (deploymentResult === 'success') comment += `- ✅ Azure Deployment\n`;
-            if (e2eResult === 'success') comment += `- ✅ E2E Tests\n`;
+            if (deploymentResult === 'success') comment += `- Azure Deployment\n`;
+            if (e2eResult === 'success') comment += `- E2E Tests\n`;
             
-            comment += `\n🔧 **Please fix the failing checks and push again.**\n\n---\n*Run #${{ github.run_number }}*`;
+            comment += `\n**Please fix the failing checks and push again.**\n\n---\n*Run #${{ github.run_number }}*`;
           }
           
           // Update existing comment instead of creating new ones
