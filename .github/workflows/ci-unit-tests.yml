@@ -89,15 +89,16 @@ jobs:
           "-tag:${{ env.COMPLIANCE_STANDARD }};Medical Device;Unit Tests" \
           "-historydir:TestResults/CoverageHistory"
 
-    - name: 🏥 Generate Medical Device Test Report
-      run: |
-        dotnet run --project tools/TestReporting/TestReportGenerator.csproj -- generate \
-          --test-results ./TestResults \
-          --coverage-report ./TestResults/coverage.cobertura.xml \
-          --output-dir ./TestResults \
-          --project-name "Tag Management Service" \
-          --compliance-standard "${{ env.COMPLIANCE_STANDARD }}" \
-          --include-medical-validation true
+    # Temporarily disabled - focus on core coverage reporting
+    # - name: 🏥 Generate Medical Device Test Report
+    #   run: |
+    #     dotnet run --project tools/TestReporting/TestReportGenerator.csproj -- generate \
+    #       --test-results ./TestResults \
+    #       --coverage-report ./TestResults/coverage.cobertura.xml \
+    #       --output-dir ./TestResults \
+    #       --project-name "Tag Management Service" \
+    #       --compliance-standard "${{ env.COMPLIANCE_STANDARD }}" \
+    #       --include-medical-validation true
 
     - name: 📋 Extract Coverage Information
       id: coverage-analysis
