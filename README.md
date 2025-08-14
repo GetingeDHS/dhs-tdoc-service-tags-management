@@ -1,4 +1,6 @@
-# Tag Management Microservice
+# Tag Management Service
+
+> Testing Key Vault access permissions for GitHub Actions
 
 [![Build Status](https://github.com/your-org/tag-management/workflows/CI/badge.svg)](https://github.com/your-org/tag-management/actions)
 [![Test Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)](./docs/test-coverage.html)
