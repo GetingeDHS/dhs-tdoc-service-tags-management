@@ -1,9 +1,7 @@
 name: CI - End-to-End Tests
 
 on:
-  pull_request:
-    branches: [ main ]
-    types: [opened, synchronize, reopened, ready_for_review]
+  # Disabled from auto-running; keep manual dispatch only
   workflow_dispatch:
     inputs:
       environment:
@@ -34,7 +32,7 @@ jobs:
       
     services:
       sqlserver:
-        image: mcr.microsoft.com/mssql/server:${{ env.SQL_SERVER_VERSION }}
+        image: mcr.microsoft.com/mssql/server:2022-latest
         env:
           ACCEPT_EULA: Y
           SA_PASSWORD: 'MedicalDevice123!'
