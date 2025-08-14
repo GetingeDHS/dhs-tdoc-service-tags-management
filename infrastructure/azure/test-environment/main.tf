@@ -173,9 +173,9 @@ resource "azurerm_key_vault_access_policy" "app_service" {
   secret_permissions = ["Get", "List"]
 }
 
-# Note: Using shared connection string template from Key Vault
-# The application will substitute {DATABASE_NAME} and {SQL_PASSWORD} placeholders
-# with values from app settings
+# Note: Application builds connection string at runtime from:
+# - Key Vault secrets: SQL server FQDN, username, password  
+# - Environment variable: DATABASE_NAME (unique per PR)
 
 
 # Outputs

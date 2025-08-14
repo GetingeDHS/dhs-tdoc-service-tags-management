@@ -159,8 +159,6 @@ jobs:
         
         terraform plan \
           -lock-timeout=10m \
-          -var="sql_admin_username=${{ secrets.SQL_ADMIN_USERNAME }}" \
-          -var="sql_admin_password=${{ secrets.SQL_ADMIN_PASSWORD }}" \
           -var="shared_key_vault_name=${{ secrets.DHS_AIRE_SHARED_KEY_VAULT_NAME }}" \
           -var="shared_resource_group_name=${{ secrets.DHS_AIRE_SHARED_RESOURCE_GROUP_NAME }}" \
           -var="shared_sql_server_id=${{ secrets.TAGMGMT_SQL_SERVER_ID }}" \
@@ -431,8 +429,6 @@ jobs:
       run: |
         terraform init
         terraform destroy -lock-timeout=10m -auto-approve \
-          -var="sql_admin_username=${{ secrets.SQL_ADMIN_USERNAME }}" \
-          -var="sql_admin_password=${{ secrets.SQL_ADMIN_PASSWORD }}" \
           -var="shared_key_vault_name=${{ secrets.DHS_AIRE_SHARED_KEY_VAULT_NAME }}" \
           -var="shared_resource_group_name=${{ secrets.DHS_AIRE_SHARED_RESOURCE_GROUP_NAME }}" \
           -var="shared_sql_server_id=${{ secrets.TAGMGMT_SQL_SERVER_ID }}"
