@@ -50,6 +50,27 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+// Initialize database with migrations and seed data
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<TagManagement.Infrastructure.Persistence.TagManagementDbContext>();
+    try
+    {
+        Log.Information("Applying database migrations...");
+        await dbContext.Database.MigrateAsync();
+        
+        Log.Information("Seeding test data...");
+        await SeedTestDataAsync(dbContext);
+        
+        Log.Information("Database initialization completed successfully");
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "Database initialization failed");
+        // Continue anyway to allow health checks to show the issue
+    }
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {
@@ -101,45 +122,6 @@ app.MapGet("/api/info", () => new
     timestamp = DateTime.UtcNow
 });
 
-// Placeholder endpoints for E2E testing (will be replaced with real controllers)
-app.MapGet("/api/tags", () => new[]
-{
-    new { TagID = 1, TagNumber = "PREP-001", TagType = "Prep Tag", IsAutoTag = false, TagStatus = "Active", CreatedDate = DateTime.UtcNow.AddDays(-1) },
-    new { TagID = 2, TagNumber = "BUNDLE-001", TagType = "Bundle Tag", IsAutoTag = true, TagStatus = "Active", CreatedDate = DateTime.UtcNow.AddDays(-2) },
-    new { TagID = 3, TagNumber = "BASKET-001", TagType = "Basket Tag", IsAutoTag = false, TagStatus = "Active", CreatedDate = DateTime.UtcNow.AddDays(-3) }
-});
-
-app.MapGet("/api/tags/{id:int}", (int id) => 
-{
-    if (id == 1)
-        return Results.Ok(new { TagID = 1, TagNumber = "PREP-001", TagType = "Prep Tag", IsAutoTag = false, TagStatus = "Active", CreatedDate = DateTime.UtcNow.AddDays(-1) });
-    
-    return Results.NotFound(new { message = $"Tag with ID {id} not found" });
-});
-
-app.MapGet("/api/tags/types", () => new[]
-{
-    new { TagTypeID = 1, TagTypeName = "Prep Tag", TagTypeCode = "PREP", IsActive = true },
-    new { TagTypeID = 2, TagTypeName = "Bundle Tag", TagTypeCode = "BUNDLE", IsActive = true },
-    new { TagTypeID = 3, TagTypeName = "Basket Tag", TagTypeCode = "BASKET", IsActive = true },
-    new { TagTypeID = 4, TagTypeName = "Sterilization Load Tag", TagTypeCode = "STERIL", IsActive = true }
-});
-
-app.MapGet("/api/tags/{id:int}/contents", (int id) => new[]
-{
-    new { TagContentID = 1, TagID = id, UnitID = 1, ContentType = "Unit", Quantity = 1 },
-    new { TagContentID = 2, TagID = id, UnitID = 2, ContentType = "Unit", Quantity = 1 }
-});
-
-app.MapPost("/api/tags", (object request) => 
-{
-    var newTag = new { TagID = 99, TagNumber = "TEST-NEW", TagType = "Prep Tag", IsAutoTag = false, TagStatus = "Active", CreatedDate = DateTime.UtcNow };
-    return Results.Created($"/api/tags/99", newTag);
-});
-
-app.MapDelete("/api/tags/{id:int}", (int id) => Results.NoContent());
-
-app.MapPost("/api/tags/{id:int}/units", (int id, object request) => Results.Created($"/api/tags/{id}/contents", new { message = "Unit added successfully" }));
 
 // NEW: Test endpoint to verify Azure deployment
 app.MapGet("/api/test/azure-deployment", () => new
@@ -191,7 +173,149 @@ app.MapGet("/api/test/workflow-validation", () => new
     }
 });
 
+// Additional endpoints that E2E tests expect (to supplement the TagsController)
+app.MapGet("/api/tags/types", async (TagManagement.Infrastructure.Persistence.TagManagementDbContext dbContext) =>
+{
+    var tagTypes = await dbContext.TagTypes
+        .Where(tt => tt.IsActive == true)
+        .Select(tt => new {
+            TagTypeID = tt.TagTypeKeyId,
+            TagTypeName = tt.TagTypeName,
+            TagTypeCode = tt.TagTypeCode,
+            IsActive = tt.IsActive
+        })
+        .ToListAsync();
+    return Results.Ok(tagTypes);
+});
+
+app.MapGet("/api/tags/{id:int}/contents", async (int id, TagManagement.Infrastructure.Persistence.TagManagementDbContext dbContext) =>
+{
+    var tagContents = await dbContext.TagContents
+        .Where(tc => tc.ParentTagKeyId == id)
+        .Select(tc => new {
+            TagContentID = tc.TagContentKeyId,
+            TagID = tc.ParentTagKeyId,
+            UnitID = tc.UnitKeyId,
+            ChildTagID = tc.ChildTagKeyId,
+            ContentType = tc.UnitKeyId.HasValue ? "Unit" : tc.ChildTagKeyId.HasValue ? "Tag" : "Item",
+            ItemDescription = tc.UnitKeyId.HasValue ? $"Unit {tc.UnitKeyId}" : 
+                             tc.ChildTagKeyId.HasValue ? $"Tag {tc.ChildTagKeyId}" : "Item",
+            Quantity = 1
+        })
+        .ToListAsync();
+    return Results.Ok(tagContents);
+});
+
 Log.Information("Starting Tag Management API - Medical Device Service (ISO-13485 Compliant)");
+
+// Seed test data that E2E tests expect
+static async Task SeedTestDataAsync(TagManagement.Infrastructure.Persistence.TagManagementDbContext dbContext)
+{
+    // Check if we already have data
+    if (await dbContext.TagTypes.AnyAsync())
+    {
+        Log.Information("Test data already exists, skipping seeding");
+        return;
+    }
+    
+    Log.Information("Seeding test data for E2E tests...");
+    
+    // Seed TagTypes first
+    var tagTypes = new[]
+    {
+        new TagManagement.Infrastructure.Persistence.Models.TagTypeModel { TagTypeKeyId = 1, TagTypeName = "Prep Tag", TagTypeCode = "PREP", IsActive = true },
+        new TagManagement.Infrastructure.Persistence.Models.TagTypeModel { TagTypeKeyId = 2, TagTypeName = "Bundle Tag", TagTypeCode = "BUNDLE", IsActive = true },
+        new TagManagement.Infrastructure.Persistence.Models.TagTypeModel { TagTypeKeyId = 3, TagTypeName = "Basket Tag", TagTypeCode = "BASKET", IsActive = true },
+        new TagManagement.Infrastructure.Persistence.Models.TagTypeModel { TagTypeKeyId = 4, TagTypeName = "Sterilization Load Tag", TagTypeCode = "STERIL", IsActive = true }
+    };
+    
+    await dbContext.TagTypes.AddRangeAsync(tagTypes);
+    await dbContext.SaveChangesAsync();
+    
+    // Seed Locations
+    var locations = new[]
+    {
+        new TagManagement.Infrastructure.Persistence.Models.LocationModel { LocationKeyId = 1, LocationName = "Test Location A", IsActive = true },
+        new TagManagement.Infrastructure.Persistence.Models.LocationModel { LocationKeyId = 2, LocationName = "Test Location B", IsActive = true }
+    };
+    
+    await dbContext.Locations.AddRangeAsync(locations);
+    await dbContext.SaveChangesAsync();
+    
+    // Seed Units
+    var units = new[]
+    {
+        new TagManagement.Infrastructure.Persistence.Models.UnitModel { UnitKeyId = 1, UnitNumber = 1, SerialNumber = "TEST-UNIT-001", LocationKeyId = 1, Status = 1 },
+        new TagManagement.Infrastructure.Persistence.Models.UnitModel { UnitKeyId = 2, UnitNumber = 2, SerialNumber = "TEST-UNIT-002", LocationKeyId = 1, Status = 1 }
+    };
+    
+    await dbContext.Units.AddRangeAsync(units);
+    await dbContext.SaveChangesAsync();
+    
+    // Seed Tags that tests expect
+    var tags = new[]
+    {
+        new TagManagement.Infrastructure.Persistence.Models.TagsModel 
+        { 
+            TagKeyId = 1, 
+            TagNumber = 1, 
+            TagTypeKeyId = 1, // PREP
+            IsAutoTag = false, 
+            LocationKeyId = 1,
+            CreatedTime = DateTime.UtcNow.AddDays(-1),
+            CreatedByUserKeyId = 1
+        },
+        new TagManagement.Infrastructure.Persistence.Models.TagsModel 
+        { 
+            TagKeyId = 2, 
+            TagNumber = 2, 
+            TagTypeKeyId = 2, // BUNDLE
+            IsAutoTag = true, 
+            LocationKeyId = 1,
+            CreatedTime = DateTime.UtcNow.AddDays(-2),
+            CreatedByUserKeyId = 1
+        },
+        new TagManagement.Infrastructure.Persistence.Models.TagsModel 
+        { 
+            TagKeyId = 3, 
+            TagNumber = 3, 
+            TagTypeKeyId = 3, // BASKET
+            IsAutoTag = false, 
+            LocationKeyId = 1,
+            CreatedTime = DateTime.UtcNow.AddDays(-3),
+            CreatedByUserKeyId = 1
+        }
+    };
+    
+    await dbContext.Tags.AddRangeAsync(tags);
+    await dbContext.SaveChangesAsync();
+    
+    // Seed TagContent so tag 1 has units
+    var tagContents = new[]
+    {
+        new TagManagement.Infrastructure.Persistence.Models.TagContentModel
+        {
+            ParentTagKeyId = 1,
+            UnitKeyId = 1,
+            LocationKeyId = 1,
+            CreatedTime = DateTime.UtcNow,
+            CreatedByUserKeyId = 1
+        },
+        new TagManagement.Infrastructure.Persistence.Models.TagContentModel
+        {
+            ParentTagKeyId = 1,
+            UnitKeyId = 2,
+            LocationKeyId = 1,
+            CreatedTime = DateTime.UtcNow,
+            CreatedByUserKeyId = 1
+        }
+    };
+    
+    await dbContext.TagContents.AddRangeAsync(tagContents);
+    await dbContext.SaveChangesAsync();
+    
+    Log.Information("Test data seeding completed successfully");
+}
 
 // Helper method to build connection string from environment variables
 static string BuildConnectionString(IConfiguration configuration)
