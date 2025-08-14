@@ -1,4 +1,4 @@
-name: Playwright E2E Tests - Azure Environment
+name: PR - Temp Deploy + Playwright E2E
 
 on:
   pull_request:
@@ -8,8 +8,6 @@ on:
       - 'src/**'
       - 'tests/**'
       - '.github/workflows/**'
-    paths-ignore:
-      - '**/*.md'
   workflow_dispatch:
     inputs:
       environment:
