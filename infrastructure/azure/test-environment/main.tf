@@ -59,11 +59,9 @@ resource "azurerm_mssql_database" "main" {
   server_id      = var.shared_sql_server_id
   collation      = "SQL_Latin1_General_CP1_CI_AS"
   
-  # Serverless configuration - same as main infrastructure
-  sku_name                    = "GP_S_Gen5_1"
-  auto_pause_delay_in_minutes = 60    # Auto-pause after 1 hour of inactivity
-  min_capacity                = 0.5   # Minimum vCores (lowest possible)
-  max_capacity                = 1     # Maximum vCores (keep low for POC)
+  # Basic SKU for simple, reliable test environment
+  sku_name = "Basic"
+  max_size_gb = 2
   
   # Basic backup settings for test environment
   short_term_retention_policy {
