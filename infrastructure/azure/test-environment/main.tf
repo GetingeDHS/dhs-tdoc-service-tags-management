@@ -58,7 +58,6 @@ resource "azurerm_mssql_database" "main" {
   name           = "sqldb-${local.project}-${local.environment}-${random_string.unique_suffix.result}"
   server_id      = var.shared_sql_server_id
   collation      = "SQL_Latin1_General_CP1_CI_AS"
-  license_type   = "LicenseIncluded"
   
   # Serverless configuration - lowest tier for PR testing
   sku_name                    = "GP_S_Gen5_1"
