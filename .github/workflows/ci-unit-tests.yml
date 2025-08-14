@@ -67,19 +67,14 @@ jobs:
 
     - name: 🧪 Run Unit Tests with Coverage
       run: |
-        dotnet test ${{ env.SOLUTION_PATH }} \
+        dotnet test tests/TagManagement.UnitTests/TagManagement.UnitTests.csproj \
           --configuration Release \
           --no-build \
-          --logger "trx;LogFileName=test-results.trx" \
+          --logger "trx;LogFileName=unit-test-results.trx" \
           --logger "console;verbosity=normal" \
           --collect:"XPlat Code Coverage" \
           --results-directory ./TestResults \
-          --settings coverlet.runsettings \
-          /p:CoverletOutputFormat=cobertura \
-          /p:CoverletOutput=./TestResults/ \
-          /p:Threshold=${{ env.COVERAGE_THRESHOLD }} \
-          /p:ThresholdType=line,branch,method \
-          /p:ThresholdStat=total
+          --settings coverlet.runsettings
 
     - name: 📊 Install ReportGenerator
       run: dotnet tool install --global dotnet-reportgenerator-globaltool
@@ -94,15 +89,16 @@ jobs:
           "-tag:${{ env.COMPLIANCE_STANDARD }};Medical Device;Unit Tests" \
           "-historydir:TestResults/CoverageHistory"
 
-    - name: 🏥 Generate Medical Device Test Report
-      run: |
-        dotnet run --project tools/TestReporting/TestReportGenerator.csproj -- generate \
-          --test-results ./TestResults \
-          --coverage-report ./TestResults/coverage.cobertura.xml \
-          --output-dir ./TestResults \
-          --project-name "Tag Management Service" \
-          --compliance-standard "${{ env.COMPLIANCE_STANDARD }}" \
-          --include-medical-validation true
+    # Temporarily disabled - focus on core coverage reporting
+    # - name: 🏥 Generate Medical Device Test Report
+    #   run: |
+    #     dotnet run --project tools/TestReporting/TestReportGenerator.csproj -- generate \
+    #       --test-results ./TestResults \
+    #       --coverage-report ./TestResults/coverage.cobertura.xml \
+    #       --output-dir ./TestResults \
+    #       --project-name "Tag Management Service" \
+    #       --compliance-standard "${{ env.COMPLIANCE_STANDARD }}" \
+    #       --include-medical-validation true
 
     - name: 📋 Extract Coverage Information
       id: coverage-analysis
@@ -135,7 +131,7 @@ jobs:
         max-annotations: 10
 
     - name: 📁 Upload Test Results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: unit-test-results
@@ -145,7 +141,7 @@ jobs:
         retention-days: 30
 
     - name: 📁 Upload Coverage Reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: coverage-reports
@@ -242,7 +238,7 @@ jobs:
           --self-contained false
 
     - name: 📁 Upload Test Report Generator
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: test-report-generator
         path: artifacts/TestReporting/

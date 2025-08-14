@@ -293,7 +293,7 @@ jobs:
         cat deployment-report.md
 
     - name: 📁 Upload Deployment Artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: deployment-report-${{ env.DEPLOYMENT_ENV }}
         path: deployment-report.md
