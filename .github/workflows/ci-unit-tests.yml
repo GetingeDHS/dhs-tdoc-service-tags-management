@@ -67,10 +67,10 @@ jobs:
 
     - name: 🧪 Run Unit Tests with Coverage
       run: |
-        dotnet test ${{ env.SOLUTION_PATH }} \
+        dotnet test tests/TagManagement.UnitTests/TagManagement.UnitTests.csproj \
           --configuration Release \
           --no-build \
-          --logger "trx;LogFileName=test-results.trx" \
+          --logger "trx;LogFileName=unit-test-results.trx" \
           --logger "console;verbosity=normal" \
           --collect:"XPlat Code Coverage" \
           --results-directory ./TestResults \

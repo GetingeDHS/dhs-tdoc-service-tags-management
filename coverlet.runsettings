@@ -10,7 +10,7 @@
     <DataCollectors>
       <DataCollector friendlyName="XPlat code coverage">
         <Configuration>
-          <Format>cobertura,opencover,lcov,teamcity,json</Format>
+          <Format>cobertura,lcov,teamcity,json</Format>
           <Exclude>[*.Tests?]*,[*]*.Program,[*]*Exception*</Exclude>
           <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
           <ExcludeByFile>**/Migrations/**/*.cs,**/wwwroot/**/*.js</ExcludeByFile>
@@ -19,7 +19,7 @@
           <UseSourceLink>true</UseSourceLink>
           <IncludeTestAssembly>false</IncludeTestAssembly>
           <SkipAutoProps>true</SkipAutoProps>
-          <DeterministicReport>true</DeterministicReport>
+          <DeterministicReport>false</DeterministicReport>
         </Configuration>
       </DataCollector>
     </DataCollectors>
