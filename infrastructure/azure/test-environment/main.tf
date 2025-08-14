@@ -107,12 +107,16 @@ resource "azurerm_linux_web_app" "main" {
   }
   
   app_settings = {
-    # Use Key Vault reference for connection string
-    "ConnectionStrings__DefaultConnection" = "@Microsoft.KeyVault(VaultName=${var.shared_key_vault_name};SecretName=test-db-connection-string-${random_string.unique_suffix.result})"
     "ASPNETCORE_ENVIRONMENT" = "Testing"
     "Logging__LogLevel__Default" = "Information"
     "AllowedHosts" = "*"
     "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.main.connection_string
+    
+    # Database connection components - app will build connection string at runtime
+    "DATABASE_NAME" = azurerm_mssql_database.main.name
+    "SQL_SERVER_FQDN" = "@Microsoft.KeyVault(VaultName=${var.shared_key_vault_name};SecretName=tagmgmt-sql-server-fqdn)"
+    "SQL_USERNAME" = "@Microsoft.KeyVault(VaultName=${var.shared_key_vault_name};SecretName=tagmgmt-sql-admin-username)"
+    "SQL_PASSWORD" = "@Microsoft.KeyVault(VaultName=${var.shared_key_vault_name};SecretName=tagmgmt-sql-admin-password)"
   }
   
   identity {
@@ -169,19 +173,9 @@ resource "azurerm_key_vault_access_policy" "app_service" {
   secret_permissions = ["Get", "List"]
 }
 
-# Store test environment connection string in shared Key Vault
-resource "azurerm_key_vault_secret" "test_connection_string" {
-  name         = "test-db-connection-string-${random_string.unique_suffix.result}"
-  value        = "Server=tcp:${data.azurerm_key_vault_secret.tagmgmt_sql_server_fqdn.value},1433;Initial Catalog=${azurerm_mssql_database.main.name};Persist Security Info=False;User ID=${data.azurerm_key_vault_secret.tagmgmt_sql_admin_username.value};Password=${data.azurerm_key_vault_secret.tagmgmt_sql_admin_password.value};MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
-  key_vault_id = data.azurerm_key_vault.shared.id
-  
-  # Ensure the access policy is created first
-  depends_on = [
-    azurerm_key_vault_access_policy.app_service
-  ]
-  
-  tags = local.tags
-}
+# Note: Using shared connection string template from Key Vault
+# The application will substitute {DATABASE_NAME} and {SQL_PASSWORD} placeholders
+# with values from app settings
 
 
 # Outputs
@@ -211,13 +205,12 @@ output "sql_database_name" {
   value       = azurerm_mssql_database.main.name
 }
 
-output "connection_string" {
-  description = "Database connection string for test environment"
-  value       = azurerm_key_vault_secret.test_connection_string.value
-  sensitive   = true
+output "connection_string_template" {
+  description = "Shared connection string template from Key Vault"
+  value       = "tagmgmt-test-connection-string"
 }
 
 output "key_vault_secret_name" {
-  description = "Name of the Key Vault secret containing the connection string"
-  value       = azurerm_key_vault_secret.test_connection_string.name
+  description = "Name of the shared Key Vault secret containing the connection string template"
+  value       = "tagmgmt-test-connection-string"
 }

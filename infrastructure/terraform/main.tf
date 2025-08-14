@@ -150,7 +150,6 @@ resource "azurerm_mssql_database" "main" {
   name         = "TDOC"
   server_id    = azurerm_mssql_server.main.id
   collation    = "SQL_Latin1_General_CP1_CI_AS"
-  license_type = "LicenseIncluded"
   
   # Serverless configuration - lowest tier for POC
   sku_name                    = "GP_S_Gen5_1"

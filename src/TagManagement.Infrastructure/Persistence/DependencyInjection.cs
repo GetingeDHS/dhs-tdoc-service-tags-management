@@ -9,11 +9,14 @@ namespace TagManagement.Infrastructure
 {
     public static class DependencyInjection
     {
-        public static IServiceCollection AddDataServices(this IServiceCollection services, IConfiguration configuration)
+        public static IServiceCollection AddDataServices(this IServiceCollection services, IConfiguration configuration, string? connectionString = null)
         {
+            // Use provided connection string or fall back to configuration
+            var dbConnectionString = connectionString ?? configuration.GetConnectionString("DefaultConnection");
+            
             // Add DbContext - configured to use existing TDOC database schema
             services.AddDbContext<TagManagementDbContext>(options =>
-                options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
+                options.UseSqlServer(dbConnectionString));
 
             // Add repositories - using TDOC-aware implementation
             services.AddScoped<ITagRepository, TDocTagRepository>();

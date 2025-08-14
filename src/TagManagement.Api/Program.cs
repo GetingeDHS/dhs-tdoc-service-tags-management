@@ -18,8 +18,12 @@ builder.Host.UseSerilog();
 
 // Add services to the container.
 
+// Build connection string from environment variables
+// This allows for dynamic database names while keeping credentials in Key Vault
+var connectionString = BuildConnectionString(builder.Configuration);
+
 // Add data layer services (includes DbContext and repositories)
-builder.Services.AddDataServices(builder.Configuration);
+builder.Services.AddDataServices(builder.Configuration, connectionString);
 
 // Add application services
 builder.Services.AddScoped<ITagService, TagService>();
@@ -40,10 +44,6 @@ builder.Services.AddSwaggerGen(c =>
         Description = "Medical Device Tag Management Microservice - ISO-13485 Compliant"
     });
 });
-
-// Add health checks
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? "Server=localhost;Database=TDocDB;Integrated Security=true;TrustServerCertificate=true;";
 
 builder.Services.AddHealthChecks()
     .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy());
@@ -142,6 +142,36 @@ app.MapDelete("/api/tags/{id:int}", (int id) => Results.NoContent());
 app.MapPost("/api/tags/{id:int}/units", (int id, object request) => Results.Created($"/api/tags/{id}/contents", new { message = "Unit added successfully" }));
 
 Log.Information("Starting Tag Management API - Medical Device Service (ISO-13485 Compliant)");
+
+// Helper method to build connection string from environment variables
+static string BuildConnectionString(IConfiguration configuration)
+{
+    // Try to get from standard connection string first (for local development)
+    var standardConnectionString = configuration.GetConnectionString("DefaultConnection");
+    if (!string.IsNullOrEmpty(standardConnectionString))
+    {
+        return standardConnectionString;
+    }
+    
+    // Build from environment variables (for Azure deployment)
+    var sqlServerFqdn = configuration["SQL_SERVER_FQDN"];
+    var sqlUsername = configuration["SQL_USERNAME"];
+    var sqlPassword = configuration["SQL_PASSWORD"];
+    var databaseName = configuration["DATABASE_NAME"];
+    
+    // Fall back to local development if env vars not available
+    if (string.IsNullOrEmpty(sqlServerFqdn) || string.IsNullOrEmpty(databaseName))
+    {
+        Log.Warning("Environment variables for database connection not found, using local development defaults");
+        return "Server=localhost;Database=TDocDB;Integrated Security=true;TrustServerCertificate=true;";
+    }
+    
+    var connectionString = $"Server={sqlServerFqdn};Database={databaseName};User Id={sqlUsername};Password={sqlPassword};Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;MultipleActiveResultSets=True;";
+    
+    Log.Information("Built connection string for database: {DatabaseName} on server: {ServerFqdn}", databaseName, sqlServerFqdn);
+    
+    return connectionString;
+}
 
 try
 {
