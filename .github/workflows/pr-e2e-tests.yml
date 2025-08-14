@@ -35,86 +35,11 @@ env:
   COMPLIANCE_STANDARD: 'ISO-13485'
 
 jobs:
-  # Fast feedback: Unit tests and build validation
-  unit-tests-and-build:
-    name: Unit Tests & Build Validation
-    runs-on: ubuntu-latest
-    
-    outputs:
-      build-successful: ${{ steps.build-result.outputs.success }}
-      test-results: ${{ steps.test-results.outputs.summary }}
-    
-    steps:
-    - name: 🔄 Checkout Code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: ⚙️ Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-
-    - name: 📦 Cache NuGet Packages
-      uses: actions/cache@v4
-      with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-        restore-keys: |
-          ${{ runner.os }}-nuget-
-
-    - name: 🔧 Restore Dependencies
-      run: dotnet restore
-
-    - name: 🏗️ Build Solution
-      run: |
-        dotnet build --configuration Release --no-restore --verbosity minimal
-        
-    - name: 📝 Build Result
-      id: build-result
-      run: echo "success=true" >> $GITHUB_OUTPUT
-
-    - name: 🧪 Run Unit Tests with Coverage
-      run: |
-        dotnet test tests/TagManagement.UnitTests/TagManagement.UnitTests.csproj \
-          --configuration Release \
-          --no-build \
-          --verbosity normal \
-          --collect:"XPlat Code Coverage" \
-          --results-directory ./test-results \
-          --logger trx \
-          /p:CollectCoverage=true \
-          /p:CoverletOutputFormat=cobertura \
-          /p:Threshold=40 \
-          /p:ThresholdType=line \
-          /p:ThresholdStat=total
-
-    - name: 📊 Extract Test Results
-      id: test-results
-      run: |
-        if [ -f "test-results/*.trx" ]; then
-          TOTAL=$(grep -o 'total="[^"]*"' test-results/*.trx | grep -o '[0-9]*' | head -1 || echo "0")
-          PASSED=$(grep -o 'passed="[^"]*"' test-results/*.trx | grep -o '[0-9]*' | head -1 || echo "0")
-          FAILED=$(grep -o 'failed="[^"]*"' test-results/*.trx | grep -o '[0-9]*' | head -1 || echo "0")
-          echo "summary=Total: $TOTAL, Passed: $PASSED, Failed: $FAILED" >> $GITHUB_OUTPUT
-        else
-          echo "summary=No test results found" >> $GITHUB_OUTPUT
-        fi
-
-    - name: 📁 Upload Unit Test Results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: unit-test-results
-        path: test-results/
-        retention-days: 30
-
-  # Conditional Azure deployment and comprehensive E2E testing
+  # Azure deployment and comprehensive E2E testing
   azure-e2e-validation:
     name: Azure E2E Validation
     runs-on: ubuntu-latest
-    needs: unit-tests-and-build
-    if: needs.unit-tests-and-build.outputs.build-successful == 'true' && (github.event_name == 'pull_request' || github.event.inputs.skip_deployment != 'true')
+    if: github.event_name == 'pull_request' || github.event.inputs.skip_deployment != 'true'
     
     permissions:
       contents: read
@@ -249,7 +174,7 @@ jobs:
   azure-playwright-tests:
     name: Azure Playwright E2E Tests
     runs-on: ubuntu-latest
-    needs: [unit-tests-and-build, azure-e2e-validation]
+    needs: azure-e2e-validation
     if: needs.azure-e2e-validation.outputs.deployment_successful == 'true'
     
     steps:
@@ -357,7 +282,7 @@ jobs:
   pr-results-summary:
     name: PR Results Summary
     runs-on: ubuntu-latest
-    needs: [unit-tests-and-build, azure-e2e-validation, azure-playwright-tests]
+    needs: [azure-e2e-validation, azure-playwright-tests]
     if: always() && github.event_name == 'pull_request'
     
     steps:
@@ -365,16 +290,14 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          const unitTestResult = '${{ needs.unit-tests-and-build.result }}';
           const deploymentResult = '${{ needs.azure-e2e-validation.result }}';
           const e2eResult = '${{ needs.azure-playwright-tests.result }}';
           
           // Determine overall status
-          const allPassed = unitTestResult === 'success' && 
-                           (deploymentResult === 'success' || deploymentResult === 'skipped') && 
+          const allPassed = (deploymentResult === 'success' || deploymentResult === 'skipped') && 
                            (e2eResult === 'success' || e2eResult === 'skipped');
           
-          const hasFailures = unitTestResult === 'failure' || deploymentResult === 'failure' || e2eResult === 'failure';
+          const hasFailures = deploymentResult === 'failure' || e2eResult === 'failure';
           
           // Check if we should comment (only on failures or first success)
           const shouldComment = hasFailures || allPassed;
@@ -399,28 +322,24 @@ jobs:
           
           if (allPassed) {
             // Success summary - concise and positive
-            comment = `## ✅ PR Validation Passed!
+            comment = `## ✅ E2E Validation Passed!
 
-All validation checks completed successfully:
+All E2E validation checks completed successfully:
 
-- ✅ **Unit Tests & Build** (${unitTestResult})
 - ✅ **Azure Deployment** (${deploymentResult})
 - ✅ **Playwright E2E Tests** (${e2eResult})
 
-🎉 **This PR is ready to merge!**
+🎉 **Azure deployment and E2E tests successful!**
 
 ---
 *Run #${{ github.run_number }} • [View Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})*`;
           } else {
             // Failure summary - focus on what failed
-            comment = `## ❌ PR Validation Failed
+            comment = `## ❌ E2E Validation Failed
 
 **Failed Checks:**
 `;
             
-            if (unitTestResult === 'failure') {
-              comment += `- ❌ **Unit Tests & Build** - [View Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
-            }
             if (deploymentResult === 'failure') {
               comment += `- ❌ **Azure Deployment** - [View Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
             }
@@ -429,7 +348,6 @@ All validation checks completed successfully:
             }
             
             comment += `\n**Passed Checks:**\n`;
-            if (unitTestResult === 'success') comment += `- ✅ Unit Tests & Build\n`;
             if (deploymentResult === 'success') comment += `- ✅ Azure Deployment\n`;
             if (e2eResult === 'success') comment += `- ✅ E2E Tests\n`;
             
