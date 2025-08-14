@@ -175,10 +175,18 @@ jobs:
       id: terraform_output
       working-directory: ./infrastructure/azure/test-environment
       run: |
-        echo "resource_group_name=$(terraform output -raw resource_group_name)" >> $GITHUB_OUTPUT
-        echo "app_service_url=$(terraform output -raw app_service_url)" >> $GITHUB_OUTPUT
-        echo "app_service_name=$(terraform output -raw app_service_name)" >> $GITHUB_OUTPUT
-        echo "sql_database_name=$(terraform output -raw sql_database_name)" >> $GITHUB_OUTPUT
+        # Get outputs with fallback for compatibility
+        echo "resource_group_name=$(terraform output -raw resource_group_name 2>/dev/null || terraform output resource_group_name | tr -d '"')" >> $GITHUB_OUTPUT
+        echo "app_service_url=$(terraform output -raw app_service_url 2>/dev/null || terraform output app_service_url | tr -d '"')" >> $GITHUB_OUTPUT
+        echo "app_service_name=$(terraform output -raw app_service_name 2>/dev/null || terraform output app_service_name | tr -d '"')" >> $GITHUB_OUTPUT
+        echo "sql_database_name=$(terraform output -raw sql_database_name 2>/dev/null || terraform output sql_database_name | tr -d '"')" >> $GITHUB_OUTPUT
+        
+        # Debug: Print outputs to verify they're captured
+        echo "🔍 Debug: Captured outputs:"
+        echo "  resource_group_name: $(terraform output -raw resource_group_name 2>/dev/null || terraform output resource_group_name | tr -d '"')"
+        echo "  app_service_url: $(terraform output -raw app_service_url 2>/dev/null || terraform output app_service_url | tr -d '"')"
+        echo "  app_service_name: $(terraform output -raw app_service_name 2>/dev/null || terraform output app_service_name | tr -d '"')"
+        echo "  sql_database_name: $(terraform output -raw sql_database_name 2>/dev/null || terraform output sql_database_name | tr -d '"')"
 
     - name: ⚙️ Setup .NET for Deployment
       uses: actions/setup-dotnet@v4
