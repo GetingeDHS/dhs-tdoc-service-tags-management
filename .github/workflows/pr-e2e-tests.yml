@@ -1,4 +1,4 @@
-name: PR - Full Validation Pipeline
+name: PR - E2E Tests
 
 permissions:
   contents: read

@@ -1,4 +1,4 @@
-name: PR - Unit Tests & Coverage
+name: PR - Unit Tests
 
 on:
   pull_request:
