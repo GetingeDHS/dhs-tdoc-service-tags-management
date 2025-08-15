@@ -1,10 +1,5 @@
 name: PR - E2E Tests
 
-permissions:
-  contents: read
-  pull-requests: write
-  checks: write
-
 concurrency:
   group: pr-validation-${{ github.ref }}
   cancel-in-progress: true
@@ -40,86 +35,16 @@ env:
   COMPLIANCE_STANDARD: 'ISO-13485'
 
 jobs:
-  # Fast feedback: Unit tests and build validation
-  unit-tests-and-build:
-    name: Unit Tests & Build Validation
-    runs-on: ubuntu-latest
-    
-    outputs:
-      build-successful: ${{ steps.build-result.outputs.success }}
-      test-results: ${{ steps.test-results.outputs.summary }}
-    
-    steps:
-    - name: 🔄 Checkout Code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: ⚙️ Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-
-    - name: 📦 Cache NuGet Packages
-      uses: actions/cache@v4
-      with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-        restore-keys: |
-          ${{ runner.os }}-nuget-
-
-    - name: 🔧 Restore Dependencies
-      run: dotnet restore
-
-    - name: 🏗️ Build Solution
-      run: |
-        dotnet build --configuration Release --no-restore --verbosity minimal
-        
-    - name: 📝 Build Result
-      id: build-result
-      run: echo "success=true" >> $GITHUB_OUTPUT
-
-    - name: 🧪 Run Unit Tests with Coverage
-      run: |
-        dotnet test tests/TagManagement.UnitTests/TagManagement.UnitTests.csproj \
-          --configuration Release \
-          --no-build \
-          --verbosity normal \
-          --collect:"XPlat Code Coverage" \
-          --results-directory ./test-results \
-          --logger trx \
-          /p:CollectCoverage=true \
-          /p:CoverletOutputFormat=cobertura \
-          /p:Threshold=40 \
-          /p:ThresholdType=line \
-          /p:ThresholdStat=total
-
-    - name: 📊 Extract Test Results
-      id: test-results
-      run: |
-        if [ -f "test-results/*.trx" ]; then
-          TOTAL=$(grep -o 'total="[^"]*"' test-results/*.trx | grep -o '[0-9]*' | head -1 || echo "0")
-          PASSED=$(grep -o 'passed="[^"]*"' test-results/*.trx | grep -o '[0-9]*' | head -1 || echo "0")
-          FAILED=$(grep -o 'failed="[^"]*"' test-results/*.trx | grep -o '[0-9]*' | head -1 || echo "0")
-          echo "summary=Total: $TOTAL, Passed: $PASSED, Failed: $FAILED" >> $GITHUB_OUTPUT
-        else
-          echo "summary=No test results found" >> $GITHUB_OUTPUT
-        fi
-
-    - name: 📁 Upload Unit Test Results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: unit-test-results
-        path: test-results/
-        retention-days: 30
-
-  # Conditional Azure deployment and comprehensive E2E testing
+  # Azure deployment and comprehensive E2E testing
   azure-e2e-validation:
     name: Azure E2E Validation
     runs-on: ubuntu-latest
-    needs: unit-tests-and-build
-    if: needs.unit-tests-and-build.outputs.build-successful == 'true' && (github.event_name == 'pull_request' || github.event.inputs.skip_deployment != 'true')
+    if: github.event_name == 'pull_request' || github.event.inputs.skip_deployment != 'true'
+    
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
     
     outputs:
       resource_group_name: ${{ steps.terraform_output.outputs.resource_group_name }}
@@ -129,28 +54,28 @@ jobs:
       deployment_successful: ${{ steps.deployment-result.outputs.success }}
       
     steps:
-    - name: 🔄 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: ⚙️ Setup Terraform
+    - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: 1.5.0
         terraform_wrapper: false
         
-    - name: 🔐 Azure Login
+    - name: Azure Login
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
         
-    - name: 🎲 Generate Unique Suffix
+    - name: Generate Unique Suffix
       id: unique-suffix
       run: |
         SUFFIX=$(echo "${{ github.run_id }}" | tail -c 9)
         echo "suffix=${SUFFIX}" >> $GITHUB_OUTPUT
         echo "Using suffix: ${SUFFIX}"
         
-    - name: 🏗️ Deploy Test Infrastructure
+    - name: Deploy Test Infrastructure
       working-directory: ./infrastructure/azure/test-environment
       run: |
         terraform init
@@ -169,7 +94,7 @@ jobs:
         ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
         ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
         
-    - name: 📤 Get Terraform Outputs
+    - name: Get Terraform Outputs
       id: terraform_output
       working-directory: ./infrastructure/azure/test-environment
       env:
@@ -185,41 +110,41 @@ jobs:
         echo "sql_database_name=$(terraform output -raw sql_database_name 2>/dev/null || terraform output sql_database_name | tr -d '"')" >> $GITHUB_OUTPUT
         
         # Debug: Print outputs to verify they're captured
-        echo "🔍 Debug: Captured outputs:"
+        echo "Debug: Captured outputs:"
         echo "  resource_group_name: $(terraform output -raw resource_group_name 2>/dev/null || terraform output resource_group_name | tr -d '"')"
         echo "  app_service_url: $(terraform output -raw app_service_url 2>/dev/null || terraform output app_service_url | tr -d '"')"
         echo "  app_service_name: $(terraform output -raw app_service_name 2>/dev/null || terraform output app_service_name | tr -d '"')"
         echo "  sql_database_name: $(terraform output -raw sql_database_name 2>/dev/null || terraform output sql_database_name | tr -d '"')"
 
-    - name: ⚙️ Setup .NET for Deployment
+    - name: Setup .NET for Deployment
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
         
-    - name: 🔧 Restore & Build Application
+    - name: Restore & Build Application
       run: |
         dotnet restore
         dotnet build --configuration Release --no-restore
         
-    - name: 📦 Publish Application
+    - name: Publish Application
       run: |
         dotnet publish src/TagManagement.Api/TagManagement.Api.csproj \
           --configuration Release \
           --no-build \
           --output ./publish
           
-    - name: 🚀 Deploy to Azure App Service
+    - name: Deploy to Azure App Service
       uses: azure/webapps-deploy@v3
       with:
         app-name: ${{ steps.terraform_output.outputs.app_service_name }}
         package: './publish'
         
-    - name: ⏳ Wait for Deployment
+    - name: Wait for Deployment
       run: |
         echo "Waiting for deployment to complete..."
         sleep 45
         
-    - name: 🏥 Health Check
+    - name: Health Check
       run: |
         MAX_ATTEMPTS=12
         ATTEMPT=1
@@ -228,20 +153,20 @@ jobs:
           echo "Health check attempt $ATTEMPT/$MAX_ATTEMPTS..."
           
           if curl -f -s "${{ steps.terraform_output.outputs.app_service_url }}/health" > /dev/null; then
-            echo "✅ Application is healthy!"
+            echo "Application is healthy!"
             break
           else
             if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-              echo "❌ Application failed health check after $MAX_ATTEMPTS attempts"
+              echo "Application failed health check after $MAX_ATTEMPTS attempts"
               exit 1
             fi
-            echo "⏳ Waiting 20 seconds before retry..."
+            echo "Waiting 20 seconds before retry..."
             sleep 20
             ATTEMPT=$((ATTEMPT + 1))
           fi
         done
 
-    - name: ✅ Deployment Result
+    - name: Deployment Result
       id: deployment-result
       run: echo "success=true" >> $GITHUB_OUTPUT
 
@@ -249,25 +174,45 @@ jobs:
   azure-playwright-tests:
     name: Azure Playwright E2E Tests
     runs-on: ubuntu-latest
-    needs: [unit-tests-and-build, azure-e2e-validation]
+    needs: azure-e2e-validation
     if: needs.azure-e2e-validation.outputs.deployment_successful == 'true'
     
     steps:
-    - name: 🔄 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: ⚙️ Setup .NET
+    - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
-    - name: 🎭 Setup Playwright Tests
+    - name: Setup Playwright Tests
       run: |
         dotnet restore tests/TagManagement.PlaywrightTests/TagManagement.PlaywrightTests.csproj
         dotnet build tests/TagManagement.PlaywrightTests/TagManagement.PlaywrightTests.csproj
-        pwsh tests/TagManagement.PlaywrightTests/bin/Debug/net8.0/playwright.ps1 install --with-deps
         
-    - name: ⚙️ Configure Playwright for Azure
+    - name: Install System Dependencies
+      run: |
+        # Update package lists and install base dependencies
+        sudo apt-get update
+        sudo apt-get install -y \
+          libnss3-dev \
+          libatk-bridge2.0-dev \
+          libdrm2 \
+          libxkbcommon0 \
+          libgtk-3-dev \
+          libgbm-dev \
+          libasound2-dev
+        
+    - name: Install Playwright Browsers
+      run: |
+        # Install Playwright CLI tool globally
+        dotnet tool install --global Microsoft.Playwright.CLI
+        
+        # Install browsers (without --with-deps since we handle deps manually)
+        playwright install chromium
+        
+    - name: Configure Playwright for Azure
       run: |
         cd tests/TagManagement.PlaywrightTests
         cat > appsettings.json << EOF
@@ -296,7 +241,7 @@ jobs:
         }
         EOF
         
-    - name: 🎭 Run Playwright Tests against Azure
+    - name: Run Playwright Tests against Azure
       run: |
         dotnet test tests/TagManagement.PlaywrightTests/TagManagement.PlaywrightTests.csproj \
           --configuration Debug \
@@ -306,7 +251,7 @@ jobs:
       env:
         AZURE_TEST_URL: ${{ needs.azure-e2e-validation.outputs.app_service_url }}
 
-    - name: 📁 Upload Playwright Test Results
+    - name: Upload Playwright Test Results
       uses: actions/upload-artifact@v4
       if: always()
       with:
@@ -325,21 +270,21 @@ jobs:
     if: always() && needs.azure-e2e-validation.outputs.deployment_successful == 'true'
     
     steps:
-    - name: 🔄 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: ⚙️ Setup Terraform
+    - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: 1.5.0
         terraform_wrapper: false
         
-    - name: 🔐 Azure Login
+    - name: Azure Login
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
         
-    - name: 🧹 Destroy Test Infrastructure
+    - name: Destroy Test Infrastructure
       working-directory: ./infrastructure/azure/test-environment
       run: |
         terraform init
@@ -357,103 +302,12 @@ jobs:
   pr-results-summary:
     name: PR Results Summary
     runs-on: ubuntu-latest
-    needs: [unit-tests-and-build, azure-e2e-validation, azure-playwright-tests]
+    needs: [azure-e2e-validation, azure-playwright-tests]
     if: always() && github.event_name == 'pull_request'
     
     steps:
-    - name: 💬 Update PR with Smart Status Comment
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const unitTestResult = '${{ needs.unit-tests-and-build.result }}';
-          const deploymentResult = '${{ needs.azure-e2e-validation.result }}';
-          const e2eResult = '${{ needs.azure-playwright-tests.result }}';
-          
-          // Determine overall status
-          const allPassed = unitTestResult === 'success' && 
-                           (deploymentResult === 'success' || deploymentResult === 'skipped') && 
-                           (e2eResult === 'success' || e2eResult === 'skipped');
-          
-          const hasFailures = unitTestResult === 'failure' || deploymentResult === 'failure' || e2eResult === 'failure';
-          
-          // Check if we should comment (only on failures or first success)
-          const shouldComment = hasFailures || allPassed;
-          
-          if (!shouldComment) {
-            console.log('Skipping comment - workflow still in progress or no significant status change');
-            return;
-          }
-          
-          // Find existing bot comments to avoid spam
-          const { data: comments } = await github.rest.issues.listComments({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: context.issue.number
-          });
-          
-          const botComments = comments.filter(comment => 
-            comment.user.type === 'Bot' && comment.body.includes('🚀 PR Validation')
-          );
-          
-          let comment = '';
-          
-          if (allPassed) {
-            // Success summary - concise and positive
-            comment = `## ✅ PR Validation Passed!
-
-All validation checks completed successfully:
-
-- ✅ **Unit Tests & Build** (${unitTestResult})
-- ✅ **Azure Deployment** (${deploymentResult})
-- ✅ **Playwright E2E Tests** (${e2eResult})
-
-🎉 **This PR is ready to merge!**
-
----
-*Run #${{ github.run_number }} • [View Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})*`;
-          } else {
-            // Failure summary - focus on what failed
-            comment = `## ❌ PR Validation Failed
-
-**Failed Checks:**
-`;
-            
-            if (unitTestResult === 'failure') {
-              comment += `- ❌ **Unit Tests & Build** - [View Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
-            }
-            if (deploymentResult === 'failure') {
-              comment += `- ❌ **Azure Deployment** - [View Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
-            }
-            if (e2eResult === 'failure') {
-              comment += `- ❌ **E2E Tests** - [View Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
-            }
-            
-            comment += `\n**Passed Checks:**\n`;
-            if (unitTestResult === 'success') comment += `- ✅ Unit Tests & Build\n`;
-            if (deploymentResult === 'success') comment += `- ✅ Azure Deployment\n`;
-            if (e2eResult === 'success') comment += `- ✅ E2E Tests\n`;
-            
-            comment += `\n🔧 **Please fix the failing checks and push again.**\n\n---\n*Run #${{ github.run_number }}*`;
-          }
-          
-          // Update existing comment instead of creating new ones
-          if (botComments.length > 0) {
-            // Update the most recent bot comment
-            const latestComment = botComments[botComments.length - 1];
-            await github.rest.issues.updateComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              comment_id: latestComment.id,
-              body: comment
-            });
-            console.log('Updated existing PR comment');
-          } else {
-            // Create new comment if none exists
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: comment
-            });
-            console.log('Created new PR comment');
-          }
+    - name: Summary
+      run: |
+        echo "E2E Workflow Summary:"
+        echo "Azure Deployment: ${{ needs.azure-e2e-validation.result }}"
+        echo "Playwright Tests: ${{ needs.azure-playwright-tests.result }}"

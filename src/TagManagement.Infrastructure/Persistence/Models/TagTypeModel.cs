@@ -14,6 +14,10 @@ namespace TagManagement.Infrastructure.Persistence.Models
         [MaxLength(50)]
         public string? TagTypeName { get; set; }
 
+        [Column("TAGTYPECODE")]
+        [MaxLength(10)]
+        public string? TagTypeCode { get; set; }
+
         [Column("DESCRIPTION")]
         [MaxLength(255)]
         public string? Description { get; set; }
