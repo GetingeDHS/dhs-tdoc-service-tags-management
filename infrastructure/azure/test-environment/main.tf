@@ -16,7 +16,8 @@ terraform {
     resource_group_name  = "rg-terraform-state-sweden"
     storage_account_name = "stterraformstatesweden"
     container_name       = "tfstate"
-    key                  = "test-environment.tfstate"
+    # Dynamic key will be set via terraform init -backend-config
+    # key will be: "pr-test-{github.run_id}.tfstate"
   }
 }
 

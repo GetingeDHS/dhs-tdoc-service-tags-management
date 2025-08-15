@@ -78,7 +78,12 @@ jobs:
     - name: Deploy Test Infrastructure
       working-directory: ./infrastructure/azure/test-environment
       run: |
-        terraform init
+        # Generate unique state key for this PR run
+        STATE_KEY="pr-test-${{ github.run_id }}.tfstate"
+        echo "Using state key: $STATE_KEY"
+        
+        # Initialize Terraform with dynamic backend configuration
+        terraform init -backend-config="key=$STATE_KEY"
         
         terraform plan \
           -lock-timeout=10m \
@@ -287,7 +292,13 @@ jobs:
     - name: Destroy Test Infrastructure
       working-directory: ./infrastructure/azure/test-environment
       run: |
-        terraform init
+        # Use same state key as deployment
+        STATE_KEY="pr-test-${{ github.run_id }}.tfstate"
+        echo "Using state key for cleanup: $STATE_KEY"
+        
+        # Initialize with same backend configuration
+        terraform init -backend-config="key=$STATE_KEY"
+        
         terraform destroy -lock-timeout=10m -auto-approve \
           -var="shared_key_vault_name=${{ secrets.DHS_AIRE_SHARED_KEY_VAULT_NAME }}" \
           -var="shared_resource_group_name=${{ secrets.DHS_AIRE_SHARED_RESOURCE_GROUP_NAME }}" \
@@ -297,6 +308,27 @@ jobs:
         ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
         ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
         ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+        
+    - name: Cleanup Terraform State File
+      if: always() # Run cleanup even if destroy failed
+      run: |
+        echo "🧹 Cleaning up orphaned Terraform state file..."
+        
+        # Generate the state file name (should match what was used during deployment)
+        STATE_KEY="pr-test-${{ github.run_id }}.tfstate"
+        echo "State key to cleanup: $STATE_KEY"
+        
+        # Delete the state file from Azure Storage
+        az storage blob delete \
+          --account-name "stterraformstatesweden" \
+          --container-name "tfstate" \
+          --name "$STATE_KEY" \
+          --auth-mode login \
+          --output none || {
+          echo "⚠️  State file $STATE_KEY might not exist or already deleted"
+        }
+        
+        echo "✅ State file cleanup completed"
 
   # Final PR comment with comprehensive results
   pr-results-summary:

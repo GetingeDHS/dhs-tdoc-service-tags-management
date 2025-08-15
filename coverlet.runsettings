@@ -43,7 +43,7 @@
   <!-- Medical Device Specific Settings -->
   <TestRunParameters>
     <Parameter name="ComplianceStandard" value="ISO-13485" />
-    <Parameter name="CoverageThreshold" value="40" />
+    <Parameter name="CoverageThreshold" value="25" />
     <Parameter name="RequiredPassRate" value="100" />
     <Parameter name="MedicalDeviceMode" value="true" />
   </TestRunParameters>

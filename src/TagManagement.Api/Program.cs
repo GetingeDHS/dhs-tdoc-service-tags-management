@@ -220,68 +220,71 @@ static async Task SeedTestDataAsync(TagManagement.Infrastructure.Persistence.Tag
     
     Log.Information("Seeding test data for E2E tests...");
     
-    // Seed TagTypes first
+    // Seed TagTypes first (let identity columns auto-generate)
     var tagTypes = new[]
     {
-        new TagManagement.Infrastructure.Persistence.Models.TagTypeModel { TagTypeKeyId = 1, TagTypeName = "Prep Tag", TagTypeCode = "PREP", IsActive = true },
-        new TagManagement.Infrastructure.Persistence.Models.TagTypeModel { TagTypeKeyId = 2, TagTypeName = "Bundle Tag", TagTypeCode = "BUNDLE", IsActive = true },
-        new TagManagement.Infrastructure.Persistence.Models.TagTypeModel { TagTypeKeyId = 3, TagTypeName = "Basket Tag", TagTypeCode = "BASKET", IsActive = true },
-        new TagManagement.Infrastructure.Persistence.Models.TagTypeModel { TagTypeKeyId = 4, TagTypeName = "Sterilization Load Tag", TagTypeCode = "STERIL", IsActive = true }
+        new TagManagement.Infrastructure.Persistence.Models.TagTypeModel { TagTypeName = "Prep Tag", TagTypeCode = "PREP", IsActive = true },
+        new TagManagement.Infrastructure.Persistence.Models.TagTypeModel { TagTypeName = "Bundle Tag", TagTypeCode = "BUNDLE", IsActive = true },
+        new TagManagement.Infrastructure.Persistence.Models.TagTypeModel { TagTypeName = "Basket Tag", TagTypeCode = "BASKET", IsActive = true },
+        new TagManagement.Infrastructure.Persistence.Models.TagTypeModel { TagTypeName = "Sterilization Load Tag", TagTypeCode = "STERIL", IsActive = true }
     };
     
     await dbContext.TagTypes.AddRangeAsync(tagTypes);
     await dbContext.SaveChangesAsync();
     
-    // Seed Locations
+    // Seed Locations (let identity columns auto-generate)
     var locations = new[]
     {
-        new TagManagement.Infrastructure.Persistence.Models.LocationModel { LocationKeyId = 1, LocationName = "Test Location A", IsActive = true },
-        new TagManagement.Infrastructure.Persistence.Models.LocationModel { LocationKeyId = 2, LocationName = "Test Location B", IsActive = true }
+        new TagManagement.Infrastructure.Persistence.Models.LocationModel { LocationName = "Test Location A", IsActive = true },
+        new TagManagement.Infrastructure.Persistence.Models.LocationModel { LocationName = "Test Location B", IsActive = true }
     };
     
     await dbContext.Locations.AddRangeAsync(locations);
     await dbContext.SaveChangesAsync();
     
-    // Seed Units
+    // Get the generated IDs for relationships
+    var firstLocation = locations[0];
+    var prepTagType = tagTypes[0];
+    var bundleTagType = tagTypes[1];
+    var basketTagType = tagTypes[2];
+    
+    // Seed Units (let identity columns auto-generate)
     var units = new[]
     {
-        new TagManagement.Infrastructure.Persistence.Models.UnitModel { UnitKeyId = 1, UnitNumber = 1, SerialNumber = "TEST-UNIT-001", LocationKeyId = 1, Status = 1 },
-        new TagManagement.Infrastructure.Persistence.Models.UnitModel { UnitKeyId = 2, UnitNumber = 2, SerialNumber = "TEST-UNIT-002", LocationKeyId = 1, Status = 1 }
+        new TagManagement.Infrastructure.Persistence.Models.UnitModel { UnitNumber = 1, SerialNumber = "TEST-UNIT-001", LocationKeyId = firstLocation.LocationKeyId, Status = 1 },
+        new TagManagement.Infrastructure.Persistence.Models.UnitModel { UnitNumber = 2, SerialNumber = "TEST-UNIT-002", LocationKeyId = firstLocation.LocationKeyId, Status = 1 }
     };
     
     await dbContext.Units.AddRangeAsync(units);
     await dbContext.SaveChangesAsync();
     
-    // Seed Tags that tests expect
+    // Seed Tags that tests expect (let identity columns auto-generate)
     var tags = new[]
     {
         new TagManagement.Infrastructure.Persistence.Models.TagsModel 
         { 
-            TagKeyId = 1, 
             TagNumber = 1, 
-            TagTypeKeyId = 1, // PREP
+            TagTypeKeyId = prepTagType.TagTypeKeyId, // PREP
             IsAutoTag = false, 
-            LocationKeyId = 1,
+            LocationKeyId = firstLocation.LocationKeyId,
             CreatedTime = DateTime.UtcNow.AddDays(-1),
             CreatedByUserKeyId = 1
         },
         new TagManagement.Infrastructure.Persistence.Models.TagsModel 
         { 
-            TagKeyId = 2, 
             TagNumber = 2, 
-            TagTypeKeyId = 2, // BUNDLE
+            TagTypeKeyId = bundleTagType.TagTypeKeyId, // BUNDLE
             IsAutoTag = true, 
-            LocationKeyId = 1,
+            LocationKeyId = firstLocation.LocationKeyId,
             CreatedTime = DateTime.UtcNow.AddDays(-2),
             CreatedByUserKeyId = 1
         },
         new TagManagement.Infrastructure.Persistence.Models.TagsModel 
         { 
-            TagKeyId = 3, 
             TagNumber = 3, 
-            TagTypeKeyId = 3, // BASKET
+            TagTypeKeyId = basketTagType.TagTypeKeyId, // BASKET
             IsAutoTag = false, 
-            LocationKeyId = 1,
+            LocationKeyId = firstLocation.LocationKeyId,
             CreatedTime = DateTime.UtcNow.AddDays(-3),
             CreatedByUserKeyId = 1
         }
@@ -290,22 +293,26 @@ static async Task SeedTestDataAsync(TagManagement.Infrastructure.Persistence.Tag
     await dbContext.Tags.AddRangeAsync(tags);
     await dbContext.SaveChangesAsync();
     
-    // Seed TagContent so tag 1 has units
+    // Seed TagContent so first tag has units
+    var firstTag = tags[0];
+    var firstUnit = units[0];
+    var secondUnit = units[1];
+    
     var tagContents = new[]
     {
         new TagManagement.Infrastructure.Persistence.Models.TagContentModel
         {
-            ParentTagKeyId = 1,
-            UnitKeyId = 1,
-            LocationKeyId = 1,
+            ParentTagKeyId = firstTag.TagKeyId,
+            UnitKeyId = firstUnit.UnitKeyId,
+            LocationKeyId = firstLocation.LocationKeyId,
             CreatedTime = DateTime.UtcNow,
             CreatedByUserKeyId = 1
         },
         new TagManagement.Infrastructure.Persistence.Models.TagContentModel
         {
-            ParentTagKeyId = 1,
-            UnitKeyId = 2,
-            LocationKeyId = 1,
+            ParentTagKeyId = firstTag.TagKeyId,
+            UnitKeyId = secondUnit.UnitKeyId,
+            LocationKeyId = firstLocation.LocationKeyId,
             CreatedTime = DateTime.UtcNow,
             CreatedByUserKeyId = 1
         }

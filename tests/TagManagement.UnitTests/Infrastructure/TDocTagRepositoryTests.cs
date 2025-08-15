@@ -369,6 +369,407 @@ public class TDocTagRepositoryTests : IDisposable
         newTag!.Contents.Units.Should().Contain(4001, "Unit should be in new tag");
     }
 
+    /// <summary>
+    /// MD-REPO-021: Repository must handle GetEmptyAutoTagAsync correctly
+    /// Critical for auto tag management
+    /// </summary>
+    [Fact(DisplayName = "MD-REPO-021: Repository Must Handle GetEmptyAutoTagAsync")]
+    public async Task Repository_Should_Handle_GetEmptyAutoTagAsync()
+    {
+        // Arrange - Create auto tags with and without content
+        var emptyAutoTag = new Tag
+        {
+            TagNumber = 50001,
+            TagType = TagType.PrepTag,
+            TagTypeKeyId = 0,
+            IsAuto = true,
+            LocationKeyId = 800,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "TestSystem"
+        };
+        
+        var fullAutoTag = new Tag
+        {
+            TagNumber = 50002,
+            TagType = TagType.PrepTag,
+            TagTypeKeyId = 0,
+            IsAuto = true,
+            LocationKeyId = 800,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "TestSystem"
+        };
+
+        var createdEmptyTag = await _repository.AddAsync(emptyAutoTag);
+        var createdFullTag = await _repository.AddAsync(fullAutoTag);
+        
+        // Add content to full tag
+        await _repository.AddUnitToTagAsync(createdFullTag.Id, 5001, DateTime.UtcNow, 800, false);
+
+        // Act
+        var emptyTag = await _repository.GetEmptyAutoTagAsync(TagType.PrepTag, 800);
+
+        // Assert
+        emptyTag.Should().NotBeNull("Empty auto tag should be found");
+        emptyTag!.Id.Should().Be(createdEmptyTag.Id, "Should return the empty auto tag");
+    }
+
+    /// <summary>
+    /// MD-REPO-022: Repository must handle content query methods correctly
+    /// Critical for tag content management
+    /// </summary>
+    [Fact(DisplayName = "MD-REPO-022: Repository Must Handle Content Query Methods")]
+    public async Task Repository_Should_Handle_Content_Query_Methods()
+    {
+        // Arrange - Create tags with specific content
+        var tag1 = new Tag
+        {
+            TagNumber = 60001,
+            TagType = TagType.BundleTag,
+            TagTypeKeyId = 1,
+            LocationKeyId = 900,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "TestSystem"
+        };
+
+        var tag2 = new Tag
+        {
+            TagNumber = 60002,
+            TagType = TagType.BundleTag,
+            TagTypeKeyId = 1,
+            LocationKeyId = 900,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "TestSystem"
+        };
+
+        var createdTag1 = await _repository.AddAsync(tag1);
+        var createdTag2 = await _repository.AddAsync(tag2);
+
+        // Add specific unit and item to tags
+        await _repository.AddUnitToTagAsync(createdTag1.Id, 6001, DateTime.UtcNow, 900, false);
+        var tagItem = new TagItem(7001, 8001, 9001, 3);
+        await _repository.AddItemToTagAsync(createdTag2.Id, tagItem, DateTime.UtcNow, 900);
+
+        // Act & Assert - Content queries
+        var tagsWithUnit = await _repository.GetTagsContainingUnitAsync(6001);
+        tagsWithUnit.Should().HaveCount(1, "Only one tag should contain the unit");
+        tagsWithUnit.First().Id.Should().Be(createdTag1.Id);
+
+        var tagsWithItem = await _repository.GetTagsContainingItemAsync(7001, 8001);
+        tagsWithItem.Should().HaveCount(1, "Only one tag should contain the item");
+        tagsWithItem.First().Id.Should().Be(createdTag2.Id);
+
+        var isUnitInTag = await _repository.IsUnitInAnyTagAsync(6001);
+        isUnitInTag.Should().BeTrue("Unit should be found in tags");
+
+        var isItemInTag = await _repository.IsItemInAnyTagAsync(7001, 8001);
+        isItemInTag.Should().BeTrue("Item should be found in tags");
+
+        var tag1ContentCount = await _repository.GetTagContentCountAsync(createdTag1.Id);
+        tag1ContentCount.Should().Be(1, "Tag1 should have one content item");
+
+        var isTag2Empty = await _repository.IsTagEmptyAsync(createdTag2.Id);
+        isTag2Empty.Should().BeFalse("Tag2 should not be empty");
+    }
+
+    /// <summary>
+    /// MD-REPO-023: Repository must handle hierarchy query methods correctly
+    /// Critical for tag hierarchy management
+    /// </summary>
+    [Fact(DisplayName = "MD-REPO-023: Repository Must Handle Hierarchy Query Methods")]
+    public async Task Repository_Should_Handle_Hierarchy_Query_Methods()
+    {
+        // Arrange - Create tag hierarchy
+        var rootTag = new Tag
+        {
+            TagNumber = 70001,
+            TagType = TagType.TransportBoxTag,
+            TagTypeKeyId = 8,
+            LocationKeyId = 1000,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "TestSystem"
+        };
+
+        var childTag1 = new Tag
+        {
+            TagNumber = 70002,
+            TagType = TagType.PrepTag,
+            TagTypeKeyId = 0,
+            LocationKeyId = 1000,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "TestSystem"
+        };
+
+        var childTag2 = new Tag
+        {
+            TagNumber = 70003,
+            TagType = TagType.BundleTag,
+            TagTypeKeyId = 1,
+            LocationKeyId = 1000,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "TestSystem"
+        };
+
+        var createdRoot = await _repository.AddAsync(rootTag);
+        var createdChild1 = await _repository.AddAsync(childTag1);
+        var createdChild2 = await _repository.AddAsync(childTag2);
+
+        // Create hierarchy
+        await _repository.AddTagToTagAsync(createdRoot.Id, createdChild1.Id, DateTime.UtcNow, 1000);
+        await _repository.AddTagToTagAsync(createdRoot.Id, createdChild2.Id, DateTime.UtcNow, 1000);
+
+        // Act & Assert - Hierarchy queries
+        var rootTags = await _repository.GetRootTagsAsync();
+        rootTags.Should().Contain(tag => tag.Id == createdRoot.Id, "Root tag should be in root tags collection");
+
+        var rootTagId = await _repository.GetRootTagIdAsync(createdChild1.Id);
+        rootTagId.Should().Be(createdRoot.Id, "Root of child should be the parent tag");
+    }
+
+    /// <summary>
+    /// MD-REPO-024: Repository must handle content manipulation methods
+    /// Critical for tag content operations
+    /// </summary>
+    [Fact(DisplayName = "MD-REPO-024: Repository Must Handle Content Manipulation Methods")]
+    public async Task Repository_Should_Handle_Content_Manipulation_Methods()
+    {
+        // Arrange - Create tag for content operations
+        var tag = new Tag
+        {
+            TagNumber = 80001,
+            TagType = TagType.PrepTag,
+            TagTypeKeyId = 0,
+            LocationKeyId = 1100,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "TestSystem"
+        };
+
+        var createdTag = await _repository.AddAsync(tag);
+        var currentTime = DateTime.UtcNow;
+
+        // Act & Assert - Add and remove operations
+        // Test unit operations
+        var addUnitResult = await _repository.AddUnitToTagAsync(createdTag.Id, 8001, currentTime, 1100, false);
+        addUnitResult.Should().BeTrue("Unit should be added successfully");
+
+        var removeUnitResult = await _repository.RemoveUnitFromTagAsync(createdTag.Id, 8001, currentTime, 1100);
+        removeUnitResult.Should().BeTrue("Unit should be removed successfully");
+
+        // Test item operations
+        var tagItem = new TagItem(8002, 8003, 8004, 2);
+        var addItemResult = await _repository.AddItemToTagAsync(createdTag.Id, tagItem, currentTime, 1100);
+        addItemResult.Should().BeTrue("Item should be added successfully");
+
+        var removeItemResult = await _repository.RemoveItemFromTagAsync(createdTag.Id, tagItem, currentTime, 1100);
+        removeItemResult.Should().BeTrue("Item should be removed successfully");
+
+        // Test indicator operations
+        var addIndicatorResult = await _repository.AddIndicatorToTagAsync(createdTag.Id, 8005, currentTime, 1100);
+        addIndicatorResult.Should().BeTrue("Indicator should be added successfully");
+
+        var removeIndicatorResult = await _repository.RemoveIndicatorFromTagAsync(createdTag.Id, 8005, currentTime, 1100);
+        removeIndicatorResult.Should().BeTrue("Indicator should be removed successfully");
+
+        // Test tag-to-tag operations
+        var childTag = new Tag
+        {
+            TagNumber = 80002,
+            TagType = TagType.BundleTag,
+            TagTypeKeyId = 1,
+            LocationKeyId = 1100,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "TestSystem"
+        };
+        var createdChildTag = await _repository.AddAsync(childTag);
+
+        var addTagResult = await _repository.AddTagToTagAsync(createdTag.Id, createdChildTag.Id, currentTime, 1100);
+        addTagResult.Should().BeTrue("Child tag should be added successfully");
+
+        var removeTagResult = await _repository.RemoveTagFromTagAsync(createdTag.Id, createdChildTag.Id, currentTime, 1100);
+        removeTagResult.Should().BeTrue("Child tag should be removed successfully");
+    }
+
+    /// <summary>
+    /// MD-REPO-025: Repository must handle batch operations correctly
+    /// Critical for bulk tag operations
+    /// </summary>
+    [Fact(DisplayName = "MD-REPO-025: Repository Must Handle Batch Operations")]
+    public async Task Repository_Should_Handle_Batch_Operations()
+    {
+        // Arrange - Create tags with content
+        var sourceTag = new Tag
+        {
+            TagNumber = 90001,
+            TagType = TagType.PrepTag,
+            TagTypeKeyId = 0,
+            LocationKeyId = 1200,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "TestSystem"
+        };
+
+        var transportTag = new Tag
+        {
+            TagNumber = 90002,
+            TagType = TagType.TransportTag,
+            TagTypeKeyId = 6,
+            LocationKeyId = 1200,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "TestSystem"
+        };
+
+        var createdSourceTag = await _repository.AddAsync(sourceTag);
+        var createdTransportTag = await _repository.AddAsync(transportTag);
+        var currentTime = DateTime.UtcNow;
+
+        // Add content to source tag
+        await _repository.AddUnitToTagAsync(createdSourceTag.Id, 9001, currentTime, 1200, false);
+        await _repository.AddUnitToTagAsync(createdSourceTag.Id, 9002, currentTime, 1200, false);
+
+        // Act & Assert - Batch operations
+        var moveResult = await _repository.MoveTagContentToTransportTagAsync(
+            createdSourceTag.Id, createdTransportTag.Id, currentTime, 1200);
+        moveResult.Should().BeTrue("Content should be moved successfully");
+
+        // Verify content was moved
+        var sourceTagAfterMove = await _repository.GetByIdAsync(createdSourceTag.Id);
+        var transportTagAfterMove = await _repository.GetByIdAsync(createdTransportTag.Id);
+
+        sourceTagAfterMove!.IsEmpty.Should().BeTrue("Source tag should be empty after move");
+        transportTagAfterMove!.Contents.Units.Should().HaveCount(2, "Transport tag should have moved units");
+
+        // Test dissolve operation
+        var dissolveResult = await _repository.DissolveTagAsync(createdTransportTag.Id, currentTime, 1200);
+        dissolveResult.Should().BeTrue("Tag should be dissolved successfully");
+
+        var dissolvedTag = await _repository.GetByIdAsync(createdTransportTag.Id);
+        dissolvedTag!.IsEmpty.Should().BeTrue("Dissolved tag should be empty");
+
+        // Test clear contents (which should call dissolve)
+        await _repository.AddUnitToTagAsync(createdTransportTag.Id, 9003, currentTime, 1200, false);
+        var clearResult = await _repository.ClearTagContentsAsync(createdTransportTag.Id, currentTime, 1200);
+        clearResult.Should().BeTrue("Tag contents should be cleared successfully");
+    }
+
+    /// <summary>
+    /// MD-REPO-026: Repository must handle auto tag management correctly
+    /// Critical for auto tag lifecycle
+    /// </summary>
+    [Fact(DisplayName = "MD-REPO-026: Repository Must Handle Auto Tag Management")]
+    public async Task Repository_Should_Handle_Auto_Tag_Management()
+    {
+        // Act & Assert - Auto tag operations
+        var reservedTagId = await _repository.ReserveAutoTagAsync(TagType.PrepTag, 1300);
+        reservedTagId.Should().BeGreaterThan(0, "Reserved tag should have valid ID");
+
+        var reservedTag = await _repository.GetByIdAsync(reservedTagId);
+        reservedTag.Should().NotBeNull("Reserved tag should be retrievable");
+        reservedTag!.IsAuto.Should().BeTrue("Reserved tag should be marked as auto");
+
+        var releaseResult = await _repository.ReleaseAutoTagReservationAsync(reservedTagId);
+        releaseResult.Should().BeTrue("Auto tag reservation should be released successfully");
+
+        var releasedTag = await _repository.GetByIdAsync(reservedTagId);
+        releasedTag!.IsAuto.Should().BeFalse("Released tag should no longer be auto");
+
+        // Test getting reserved auto tags
+        await _repository.ReserveAutoTagAsync(TagType.BundleTag, 1300);
+        await _repository.ReserveAutoTagAsync(TagType.PrepTag, 1300);
+        
+        var reservedTags = await _repository.GetReservedAutoTagsAsync();
+        reservedTags.Should().HaveCountGreaterOrEqualTo(2, "Should have reserved auto tags");
+    }
+
+    /// <summary>
+    /// MD-REPO-027: Repository must handle error scenarios gracefully
+    /// Critical for system reliability
+    /// </summary>
+    [Fact(DisplayName = "MD-REPO-027: Repository Must Handle Error Scenarios Gracefully")]
+    public async Task Repository_Should_Handle_Error_Scenarios_Gracefully()
+    {
+        // Act & Assert - Non-existent operations
+        var nonExistentTag = await _repository.GetByIdAsync(999999);
+        nonExistentTag.Should().BeNull("Non-existent tag should return null");
+
+        var nonExistentByNumber = await _repository.GetByNumberAndTypeAsync(999999, TagType.PrepTag);
+        nonExistentByNumber.Should().BeNull("Non-existent tag by number should return null");
+
+        var deleteNonExistent = await _repository.DeleteAsync(999999);
+        deleteNonExistent.Should().BeFalse("Delete non-existent should return false");
+
+        var removeNonExistentUnit = await _repository.RemoveUnitFromTagAsync(999999, 999999, DateTime.UtcNow, 1400);
+        removeNonExistentUnit.Should().BeFalse("Remove non-existent unit should return false");
+
+        var removeNonExistentItem = await _repository.RemoveItemFromTagAsync(999999, new TagItem(999, 999, 999, 1), DateTime.UtcNow, 1400);
+        removeNonExistentItem.Should().BeFalse("Remove non-existent item should return false");
+
+        var removeNonExistentTagFromTag = await _repository.RemoveTagFromTagAsync(999999, 999998, DateTime.UtcNow, 1400);
+        removeNonExistentTagFromTag.Should().BeFalse("Remove non-existent tag from tag should return false");
+
+        var removeNonExistentIndicator = await _repository.RemoveIndicatorFromTagAsync(999999, 999999, DateTime.UtcNow, 1400);
+        removeNonExistentIndicator.Should().BeFalse("Remove non-existent indicator should return false");
+
+        var releaseNonExistentReservation = await _repository.ReleaseAutoTagReservationAsync(999999);
+        releaseNonExistentReservation.Should().BeFalse("Release non-existent reservation should return false");
+    }
+
+    /// <summary>
+    /// MD-REPO-028: Repository must handle stub methods correctly
+    /// Critical for incomplete implementations
+    /// </summary>
+    [Fact(DisplayName = "MD-REPO-028: Repository Must Handle Stub Methods Correctly")]
+    public async Task Repository_Should_Handle_Stub_Methods_Correctly()
+    {
+        // Act & Assert - Stub implementations
+        var tagsWithReservations = await _repository.GetTagsWithReservationsAsync();
+        tagsWithReservations.Should().NotBeNull().And.BeEmpty("Stub method should return empty collection");
+
+        var linkedSplitTags = await _repository.GetLinkedSplitTagsAsync(1);
+        linkedSplitTags.Should().NotBeNull().And.BeEmpty("Stub method should return empty collection");
+
+        var splitUnitSerial = await _repository.GetSplitUnitSerialNumberSplitTagAsync(1);
+        splitUnitSerial.Should().BeNull("Stub method should return null");
+    }
+
+    /// <summary>
+    /// MD-REPO-029: Repository must handle GetAutoTagsAsync correctly
+    /// Critical for auto tag management
+    /// </summary>
+    [Fact(DisplayName = "MD-REPO-029: Repository Must Handle GetAutoTagsAsync")]
+    public async Task Repository_Should_Handle_GetAutoTagsAsync()
+    {
+        // Arrange - Create auto and regular tags
+        var autoTag = new Tag
+        {
+            TagNumber = 95001,
+            TagType = TagType.PrepTag,
+            TagTypeKeyId = 0,
+            IsAuto = true,
+            LocationKeyId = 1500,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "TestSystem"
+        };
+
+        var regularTag = new Tag
+        {
+            TagNumber = 95002,
+            TagType = TagType.BundleTag,
+            TagTypeKeyId = 1,
+            IsAuto = false,
+            LocationKeyId = 1500,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "TestSystem"
+        };
+
+        await _repository.AddAsync(autoTag);
+        await _repository.AddAsync(regularTag);
+
+        // Act
+        var autoTags = await _repository.GetAutoTagsAsync();
+
+        // Assert
+        autoTags.Should().HaveCountGreaterOrEqualTo(1, "Should find auto tags");
+        autoTags.Should().AllSatisfy(tag => tag.IsAuto.Should().BeTrue("All returned tags should be auto tags"));
+    }
+
     public void Dispose()
     {
         _context.Dispose();
