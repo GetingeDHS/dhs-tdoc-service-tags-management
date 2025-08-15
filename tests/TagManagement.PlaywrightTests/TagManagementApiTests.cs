@@ -196,6 +196,7 @@ public class TagManagementApiTests : TestBase
     {
         // This test would verify tag content operations
         // Implementation depends on the actual API endpoints available
+        await Task.CompletedTask; // Make async method actually async
         Assert.Pass("Tag content CRUD operations test - to be implemented based on actual API");
     }
 
@@ -207,6 +208,7 @@ public class TagManagementApiTests : TestBase
     {
         // This test would verify that audit trails are properly created
         // This is critical for medical device compliance
+        await Task.CompletedTask; // Make async method actually async
         Assert.Pass("Audit trail verification test - to be implemented based on actual audit requirements");
     }
 

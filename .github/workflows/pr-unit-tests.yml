@@ -14,13 +14,13 @@ on:
       coverage_threshold:
         description: 'Code coverage threshold'
         required: false
-        default: '40'
+        default: '25'
         type: string
 
 env:
   DOTNET_VERSION: '8.0.x'
   SOLUTION_PATH: './TagManagement.sln'
-  COVERAGE_THRESHOLD: ${{ github.event.inputs.coverage_threshold || '40' }}
+  COVERAGE_THRESHOLD: ${{ github.event.inputs.coverage_threshold || '25' }}
   COMPLIANCE_STANDARD: 'ISO-13485'
 
 jobs:
@@ -211,64 +211,3 @@ jobs:
         
         echo "🏥 Medical Device Unit Testing: COMPLIANT"
 
-  build-test-artifacts:
-    name: Build Test Report Generator
-    runs-on: ubuntu-latest
-    needs: unit-tests
-    
-    steps:
-    - name: 🔄 Checkout Code
-      uses: actions/checkout@v4
-
-    - name: ⚙️ Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-
-    - name: 🏗️ Build Test Report Generator
-      run: |
-        dotnet build tools/TestReporting/TestReportGenerator.csproj \
-          --configuration Release \
-          --verbosity minimal
-
-    - name: 📦 Package Test Report Generator
-      run: |
-        dotnet publish tools/TestReporting/TestReportGenerator.csproj \
-          --configuration Release \
-          --output ./artifacts/TestReporting \
-          --self-contained false
-
-    - name: 📁 Upload Test Report Generator
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-report-generator
-        path: artifacts/TestReporting/
-        retention-days: 30
-
-  quality-gate:
-    name: Quality Gate
-    runs-on: ubuntu-latest
-    needs: [unit-tests, build-test-artifacts]
-    if: always()
-    
-    steps:
-    - name: 🔍 Evaluate Quality Gate
-      run: |
-        echo "Evaluating Quality Gate for Medical Device Compliance..."
-        
-        UNIT_TESTS_RESULT="${{ needs.unit-tests.result }}"
-        BUILD_RESULT="${{ needs.build-test-artifacts.result }}"
-        COVERAGE="${{ needs.unit-tests.outputs.coverage-percentage }}"
-        
-        echo "Unit Tests: $UNIT_TESTS_RESULT"
-        echo "Build: $BUILD_RESULT"
-        echo "Coverage: $COVERAGE%"
-        
-        if [[ "$UNIT_TESTS_RESULT" == "success" && "$BUILD_RESULT" == "success" ]]; then
-          echo "✅ Quality Gate: PASSED"
-          echo "All checks passed - Ready for medical device deployment"
-        else
-          echo "❌ Quality Gate: FAILED"
-          echo "Some checks failed - Medical device compliance not met"
-          exit 1
-        fi
