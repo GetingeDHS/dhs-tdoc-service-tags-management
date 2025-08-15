@@ -704,4 +704,437 @@ public class InfrastructureModelTests
     }
 
     #endregion
+
+    #region LocationModel Tests
+
+    /// <summary>
+    /// MD-INFRA-021: LocationModel must initialize with default values and empty collections
+    /// Critical for proper data model initialization
+    /// </summary>
+    [Fact(DisplayName = "MD-INFRA-021: LocationModel Must Initialize With Default Values")]
+    public void LocationModel_Constructor_Should_Initialize_Default_Values()
+    {
+        // Act
+        var location = new LocationModel();
+
+        // Assert
+        location.LocationKeyId.Should().Be(0);
+        location.LocationName.Should().BeNull();
+        location.LocationCode.Should().BeNull();
+        location.Description.Should().BeNull();
+        location.ParentLocationKeyId.Should().BeNull();
+        location.IsActive.Should().BeNull();
+        location.CreatedTime.Should().BeNull();
+        location.CreatedByUserKeyId.Should().BeNull();
+        location.ModifiedTime.Should().BeNull();
+        location.ModifiedByUserKeyId.Should().BeNull();
+        
+        // Navigation properties
+        location.ParentLocation.Should().BeNull();
+        location.ChildLocations.Should().NotBeNull().And.BeEmpty();
+        location.Tags.Should().NotBeNull().And.BeEmpty();
+        location.TagContents.Should().NotBeNull().And.BeEmpty();
+        location.Units.Should().NotBeNull().And.BeEmpty();
+    }
+
+    /// <summary>
+    /// MD-INFRA-022: LocationModel properties must be settable and gettable
+    /// Critical for data persistence and retrieval
+    /// </summary>
+    [Fact(DisplayName = "MD-INFRA-022: LocationModel Properties Must Be Settable")]
+    public void LocationModel_Properties_Should_Be_Settable()
+    {
+        // Arrange
+        var location = new LocationModel();
+        var createdTime = DateTime.UtcNow;
+        var modifiedTime = DateTime.UtcNow.AddHours(1);
+
+        // Act
+        location.LocationKeyId = 500;
+        location.LocationName = "Operating Room 1";
+        location.LocationCode = "OR01";
+        location.Description = "Main operating room";
+        location.ParentLocationKeyId = 100;
+        location.IsActive = true;
+        location.CreatedTime = createdTime;
+        location.CreatedByUserKeyId = 1;
+        location.ModifiedTime = modifiedTime;
+        location.ModifiedByUserKeyId = 2;
+
+        // Assert
+        location.LocationKeyId.Should().Be(500);
+        location.LocationName.Should().Be("Operating Room 1");
+        location.LocationCode.Should().Be("OR01");
+        location.Description.Should().Be("Main operating room");
+        location.ParentLocationKeyId.Should().Be(100);
+        location.IsActive.Should().BeTrue();
+        location.CreatedTime.Should().Be(createdTime);
+        location.CreatedByUserKeyId.Should().Be(1);
+        location.ModifiedTime.Should().Be(modifiedTime);
+        location.ModifiedByUserKeyId.Should().Be(2);
+    }
+
+    /// <summary>
+    /// MD-INFRA-023: LocationModel navigation properties must support hierarchical relationships
+    /// Critical for location hierarchy management
+    /// </summary>
+    [Fact(DisplayName = "MD-INFRA-023: LocationModel Navigation Properties Must Support Hierarchical Relationships")]
+    public void LocationModel_Navigation_Properties_Should_Support_Hierarchical_Relationships()
+    {
+        // Arrange
+        var parentLocation = new LocationModel { LocationKeyId = 1, LocationName = "Hospital" };
+        var childLocation1 = new LocationModel { LocationKeyId = 2, LocationName = "OR Wing" };
+        var childLocation2 = new LocationModel { LocationKeyId = 3, LocationName = "ICU Wing" };
+        var tag = new TagsModel { TagKeyId = 1 };
+        var tagContent = new TagContentModel { TagContentKeyId = 1 };
+        var unit = new UnitModel { UnitKeyId = 1 };
+
+        // Act
+        childLocation1.ParentLocation = parentLocation;
+        parentLocation.ChildLocations.Add(childLocation1);
+        parentLocation.ChildLocations.Add(childLocation2);
+        parentLocation.Tags.Add(tag);
+        parentLocation.TagContents.Add(tagContent);
+        parentLocation.Units.Add(unit);
+
+        // Assert
+        childLocation1.ParentLocation.Should().BeSameAs(parentLocation);
+        parentLocation.ChildLocations.Should().HaveCount(2);
+        parentLocation.ChildLocations.Should().Contain(childLocation1);
+        parentLocation.ChildLocations.Should().Contain(childLocation2);
+        parentLocation.Tags.Should().HaveCount(1);
+        parentLocation.Tags.Should().Contain(tag);
+        parentLocation.TagContents.Should().HaveCount(1);
+        parentLocation.TagContents.Should().Contain(tagContent);
+        parentLocation.Units.Should().HaveCount(1);
+        parentLocation.Units.Should().Contain(unit);
+    }
+
+    #endregion
+
+    #region TagContentModel Tests
+
+    /// <summary>
+    /// MD-INFRA-024: TagContentModel must initialize with default values
+    /// Critical for proper tag content initialization
+    /// </summary>
+    [Fact(DisplayName = "MD-INFRA-024: TagContentModel Must Initialize With Default Values")]
+    public void TagContentModel_Constructor_Should_Initialize_Default_Values()
+    {
+        // Act
+        var tagContent = new TagContentModel();
+
+        // Assert
+        tagContent.TagContentKeyId.Should().Be(0);
+        tagContent.ParentTagKeyId.Should().Be(0);
+        tagContent.ChildTagKeyId.Should().BeNull();
+        tagContent.UnitKeyId.Should().BeNull();
+        tagContent.ItemKeyId.Should().BeNull();
+        tagContent.SerialKeyId.Should().BeNull();
+        tagContent.LotInfoKeyId.Should().BeNull();
+        tagContent.IndicatorKeyId.Should().BeNull();
+        tagContent.LocationKeyId.Should().BeNull();
+        tagContent.CreatedTime.Should().BeNull();
+        tagContent.CreatedByUserKeyId.Should().BeNull();
+        tagContent.ModifiedTime.Should().BeNull();
+        tagContent.ModifiedByUserKeyId.Should().BeNull();
+        
+        // Navigation properties
+        tagContent.ParentTag.Should().BeNull();
+        tagContent.ChildTag.Should().BeNull();
+        tagContent.Unit.Should().BeNull();
+        tagContent.Item.Should().BeNull();
+        tagContent.Location.Should().BeNull();
+        tagContent.Indicator.Should().BeNull();
+    }
+
+    /// <summary>
+    /// MD-INFRA-025: TagContentModel properties must be settable and gettable
+    /// Critical for tag content data management
+    /// </summary>
+    [Fact(DisplayName = "MD-INFRA-025: TagContentModel Properties Must Be Settable")]
+    public void TagContentModel_Properties_Should_Be_Settable()
+    {
+        // Arrange
+        var tagContent = new TagContentModel();
+        var createdTime = DateTime.UtcNow;
+        var modifiedTime = DateTime.UtcNow.AddHours(1);
+
+        // Act
+        tagContent.TagContentKeyId = 600;
+        tagContent.ParentTagKeyId = 100;
+        tagContent.ChildTagKeyId = 200;
+        tagContent.UnitKeyId = 300;
+        tagContent.ItemKeyId = 400;
+        tagContent.SerialKeyId = 500;
+        tagContent.LotInfoKeyId = 600;
+        tagContent.IndicatorKeyId = 700;
+        tagContent.LocationKeyId = 800;
+        tagContent.CreatedTime = createdTime;
+        tagContent.CreatedByUserKeyId = 1;
+        tagContent.ModifiedTime = modifiedTime;
+        tagContent.ModifiedByUserKeyId = 2;
+
+        // Assert
+        tagContent.TagContentKeyId.Should().Be(600);
+        tagContent.ParentTagKeyId.Should().Be(100);
+        tagContent.ChildTagKeyId.Should().Be(200);
+        tagContent.UnitKeyId.Should().Be(300);
+        tagContent.ItemKeyId.Should().Be(400);
+        tagContent.SerialKeyId.Should().Be(500);
+        tagContent.LotInfoKeyId.Should().Be(600);
+        tagContent.IndicatorKeyId.Should().Be(700);
+        tagContent.LocationKeyId.Should().Be(800);
+        tagContent.CreatedTime.Should().Be(createdTime);
+        tagContent.CreatedByUserKeyId.Should().Be(1);
+        tagContent.ModifiedTime.Should().Be(modifiedTime);
+        tagContent.ModifiedByUserKeyId.Should().Be(2);
+    }
+
+    /// <summary>
+    /// MD-INFRA-026: TagContentModel navigation properties must support complex relationships
+    /// Critical for tag content relationship management
+    /// </summary>
+    [Fact(DisplayName = "MD-INFRA-026: TagContentModel Navigation Properties Must Support Complex Relationships")]
+    public void TagContentModel_Navigation_Properties_Should_Support_Complex_Relationships()
+    {
+        // Arrange
+        var tagContent = new TagContentModel();
+        var parentTag = new TagsModel { TagKeyId = 1 };
+        var childTag = new TagsModel { TagKeyId = 2 };
+        var unit = new UnitModel { UnitKeyId = 1 };
+        var item = new ItemModel { ItemKeyId = 1 };
+        var location = new LocationModel { LocationKeyId = 1 };
+        var indicator = new IndicatorModel { IndicatorKeyId = 1 };
+
+        // Act
+        tagContent.ParentTag = parentTag;
+        tagContent.ChildTag = childTag;
+        tagContent.Unit = unit;
+        tagContent.Item = item;
+        tagContent.Location = location;
+        tagContent.Indicator = indicator;
+
+        // Assert
+        tagContent.ParentTag.Should().BeSameAs(parentTag);
+        tagContent.ChildTag.Should().BeSameAs(childTag);
+        tagContent.Unit.Should().BeSameAs(unit);
+        tagContent.Item.Should().BeSameAs(item);
+        tagContent.Location.Should().BeSameAs(location);
+        tagContent.Indicator.Should().BeSameAs(indicator);
+    }
+
+    #endregion
+
+    #region TagsModel Tests
+
+    /// <summary>
+    /// MD-INFRA-027: TagsModel must initialize with default values and empty collections
+    /// Critical for proper tag initialization
+    /// </summary>
+    [Fact(DisplayName = "MD-INFRA-027: TagsModel Must Initialize With Default Values")]
+    public void TagsModel_Constructor_Should_Initialize_Default_Values()
+    {
+        // Act
+        var tag = new TagsModel();
+
+        // Assert
+        tag.TagKeyId.Should().Be(0);
+        tag.TagNumber.Should().BeNull();
+        tag.TagTypeKeyId.Should().BeNull();
+        tag.LocationKeyId.Should().BeNull();
+        tag.ProcessBatchKeyId.Should().BeNull();
+        tag.IsAutoTag.Should().BeNull();
+        tag.CreatedTime.Should().BeNull();
+        tag.CreatedByUserKeyId.Should().BeNull();
+        tag.ModifiedTime.Should().BeNull();
+        tag.ModifiedByUserKeyId.Should().BeNull();
+        
+        // Navigation properties
+        tag.Location.Should().BeNull();
+        tag.TagType.Should().BeNull();
+        tag.TagContents.Should().NotBeNull().And.BeEmpty();
+    }
+
+    /// <summary>
+    /// MD-INFRA-028: TagsModel properties must be settable and gettable
+    /// Critical for tag data management
+    /// </summary>
+    [Fact(DisplayName = "MD-INFRA-028: TagsModel Properties Must Be Settable")]
+    public void TagsModel_Properties_Should_Be_Settable()
+    {
+        // Arrange
+        var tag = new TagsModel();
+        var createdTime = DateTime.UtcNow;
+        var modifiedTime = DateTime.UtcNow.AddHours(1);
+
+        // Act
+        tag.TagKeyId = 700;
+        tag.TagNumber = 12345;
+        tag.TagTypeKeyId = 1;
+        tag.LocationKeyId = 200;
+        tag.ProcessBatchKeyId = 300;
+        tag.IsAutoTag = true;
+        tag.CreatedTime = createdTime;
+        tag.CreatedByUserKeyId = 1;
+        tag.ModifiedTime = modifiedTime;
+        tag.ModifiedByUserKeyId = 2;
+
+        // Assert
+        tag.TagKeyId.Should().Be(700);
+        tag.TagNumber.Should().Be(12345);
+        tag.TagTypeKeyId.Should().Be(1);
+        tag.LocationKeyId.Should().Be(200);
+        tag.ProcessBatchKeyId.Should().Be(300);
+        tag.IsAutoTag.Should().BeTrue();
+        tag.CreatedTime.Should().Be(createdTime);
+        tag.CreatedByUserKeyId.Should().Be(1);
+        tag.ModifiedTime.Should().Be(modifiedTime);
+        tag.ModifiedByUserKeyId.Should().Be(2);
+    }
+
+    /// <summary>
+    /// MD-INFRA-029: TagsModel navigation properties must support tag relationships
+    /// Critical for tag relationship management
+    /// </summary>
+    [Fact(DisplayName = "MD-INFRA-029: TagsModel Navigation Properties Must Support Tag Relationships")]
+    public void TagsModel_Navigation_Properties_Should_Support_Tag_Relationships()
+    {
+        // Arrange
+        var tag = new TagsModel();
+        var location = new LocationModel { LocationKeyId = 1 };
+        var tagType = new TagTypeModel { TagTypeKeyId = 1 };
+        var tagContent1 = new TagContentModel { TagContentKeyId = 1 };
+        var tagContent2 = new TagContentModel { TagContentKeyId = 2 };
+
+        // Act
+        tag.Location = location;
+        tag.TagType = tagType;
+        tag.TagContents.Add(tagContent1);
+        tag.TagContents.Add(tagContent2);
+
+        // Assert
+        tag.Location.Should().BeSameAs(location);
+        tag.TagType.Should().BeSameAs(tagType);
+        tag.TagContents.Should().HaveCount(2);
+        tag.TagContents.Should().Contain(tagContent1);
+        tag.TagContents.Should().Contain(tagContent2);
+    }
+
+    #endregion
+
+    #region TagTypeModel Tests
+
+    /// <summary>
+    /// MD-INFRA-030: TagTypeModel must initialize with default values and empty collections
+    /// Critical for proper tag type initialization
+    /// </summary>
+    [Fact(DisplayName = "MD-INFRA-030: TagTypeModel Must Initialize With Default Values")]
+    public void TagTypeModel_Constructor_Should_Initialize_Default_Values()
+    {
+        // Act
+        var tagType = new TagTypeModel();
+
+        // Assert
+        tagType.TagTypeKeyId.Should().Be(0);
+        tagType.TagTypeName.Should().BeNull();
+        tagType.TagTypeCode.Should().BeNull();
+        tagType.Description.Should().BeNull();
+        tagType.IsActive.Should().BeNull();
+        tagType.CreatedTime.Should().BeNull();
+        tagType.CreatedByUserKeyId.Should().BeNull();
+        tagType.ModifiedTime.Should().BeNull();
+        tagType.ModifiedByUserKeyId.Should().BeNull();
+        
+        // Navigation properties
+        tagType.Tags.Should().NotBeNull().And.BeEmpty();
+    }
+
+    /// <summary>
+    /// MD-INFRA-031: TagTypeModel properties must be settable and gettable
+    /// Critical for tag type data management
+    /// </summary>
+    [Fact(DisplayName = "MD-INFRA-031: TagTypeModel Properties Must Be Settable")]
+    public void TagTypeModel_Properties_Should_Be_Settable()
+    {
+        // Arrange
+        var tagType = new TagTypeModel();
+        var createdTime = DateTime.UtcNow;
+        var modifiedTime = DateTime.UtcNow.AddHours(1);
+
+        // Act
+        tagType.TagTypeKeyId = 800;
+        tagType.TagTypeName = "Sterilization Load";
+        tagType.TagTypeCode = "STERIL";
+        tagType.Description = "Sterilization load container tag";
+        tagType.IsActive = true;
+        tagType.CreatedTime = createdTime;
+        tagType.CreatedByUserKeyId = 1;
+        tagType.ModifiedTime = modifiedTime;
+        tagType.ModifiedByUserKeyId = 2;
+
+        // Assert
+        tagType.TagTypeKeyId.Should().Be(800);
+        tagType.TagTypeName.Should().Be("Sterilization Load");
+        tagType.TagTypeCode.Should().Be("STERIL");
+        tagType.Description.Should().Be("Sterilization load container tag");
+        tagType.IsActive.Should().BeTrue();
+        tagType.CreatedTime.Should().Be(createdTime);
+        tagType.CreatedByUserKeyId.Should().Be(1);
+        tagType.ModifiedTime.Should().Be(modifiedTime);
+        tagType.ModifiedByUserKeyId.Should().Be(2);
+    }
+
+    /// <summary>
+    /// MD-INFRA-032: TagTypeModel navigation properties must support tag collections
+    /// Critical for tag type relationship management
+    /// </summary>
+    [Fact(DisplayName = "MD-INFRA-032: TagTypeModel Navigation Properties Must Support Tag Collections")]
+    public void TagTypeModel_Navigation_Properties_Should_Support_Tag_Collections()
+    {
+        // Arrange
+        var tagType = new TagTypeModel();
+        var tag1 = new TagsModel { TagKeyId = 1 };
+        var tag2 = new TagsModel { TagKeyId = 2 };
+        var tag3 = new TagsModel { TagKeyId = 3 };
+
+        // Act
+        tagType.Tags.Add(tag1);
+        tagType.Tags.Add(tag2);
+        tagType.Tags.Add(tag3);
+
+        // Assert
+        tagType.Tags.Should().HaveCount(3);
+        tagType.Tags.Should().Contain(tag1);
+        tagType.Tags.Should().Contain(tag2);
+        tagType.Tags.Should().Contain(tag3);
+    }
+
+    /// <summary>
+    /// MD-INFRA-033: TagTypeModel must handle string edge cases
+    /// Critical for tag type data validation
+    /// </summary>
+    [Theory(DisplayName = "MD-INFRA-033: TagTypeModel Must Handle String Edge Cases")]
+    [InlineData(null, null, null)]
+    [InlineData("", "", "")]
+    [InlineData("   ", "   ", "   ")]
+    [InlineData("Very Long Tag Type Name That Exceeds Normal Length", "VLONG", "Very long description that might exceed normal database field lengths for testing purposes")]
+    [InlineData("Tag\nWith\nNewlines", "CODE\t", "Description\rwith\rcarriage\rreturns")]
+    public void TagTypeModel_Should_Handle_String_Edge_Cases(string? name, string? code, string? description)
+    {
+        // Arrange & Act
+        var tagType = new TagTypeModel
+        {
+            TagTypeName = name,
+            TagTypeCode = code,
+            Description = description
+        };
+
+        // Assert - Should preserve the values as-is
+        tagType.TagTypeName.Should().Be(name);
+        tagType.TagTypeCode.Should().Be(code);
+        tagType.Description.Should().Be(description);
+    }
+
+    #endregion
 }
